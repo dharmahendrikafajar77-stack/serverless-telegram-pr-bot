@@ -1,10 +1,10 @@
 # serverless-telegram-pr-bot
 A serverless Telegram Bot architecture built on Google Apps Script (GAS), utilizing Google Sheets as a real-time relational database. Monalissa automates Public Relations operations, handling CRUD tasks for event delegations, partnership management (Media Partners &amp; Sponsorships), file uploads via Drive API, and automated cron-job reminders.
 
-var token = "8615744495:AAE41LfhDgcJe9toqLzCTe8I2IdXIfuzFcI"; 
-var sheetId = "1x8sOQhZr9-hkBNsfTDMvd5A_KkogNgeetWYN1wB-Cok"; 
-var grupChatId = "-4858152122"; 
-var folderId = "1fSbKRjVNG-TjtZ1sWtXcZfMhohb5I3Sa"; 
+var token = "______"; 
+var sheetId = "_______"; 
+var grupChatId = "_______"; 
+var folderId = "_______"; 
 
 function doPost(e) {
   var update = JSON.parse(e.postData.contents);
