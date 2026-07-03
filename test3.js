@@ -1,0 +1,1 @@
+let text = '/info@UKBAPR_Bot'; if (text.startsWith('/')) { var parts = text.split(' '); var cmdPart = parts[0]; if (cmdPart.indexOf('@') !== -1) { parts[0] = cmdPart.split('@')[0]; text = parts.join(' '); } } console.log(text);  
