@@ -1,9 +1,11 @@
-var token = "8615744495:AAE41LfhDgcJe9toqLzCTe8I2IdXIfuzFcI"; 
-var sheetId = "1x8sOQhZr9-hkBNsfTDMvd5A_KkogNgeetWYN1wB-Cok"; 
-var grupChatId = "-4858152122"; 
-var folderId = "1fSbKRjVNG-TjtZ1sWtXcZfMhohb5I3Sa"; 
+var scriptProperties = PropertiesService.getScriptProperties();
+var token = scriptProperties.getProperty('TELEGRAM_TOKEN'); 
+var sheetId = scriptProperties.getProperty('SHEET_ID'); 
+var grupChatId = scriptProperties.getProperty('GRUP_CHAT_ID'); 
+var folderId = scriptProperties.getProperty('FOLDER_ID'); 
 
 function doPost(e) {
+  if (!e || !e.postData || !e.postData.contents) return ContentService.createTextOutput("OK");
   var update = JSON.parse(e.postData.contents);
   
   if (update.callback_query) {
@@ -32,6 +34,11 @@ function doPost(e) {
   if (text === "/start" || text.toLowerCase() === "hey") {
     sendMessage(chatId, "Halo Tim PR! Kenalin, aku *Monalissa* 💅, asisten digital 24 jam kebanggaan divisi PR UKBA.\n\nKetik `/tutor` kalau kamu butuh panduan, atau `/info` untuk lihat daftar undangan ter-update!");
     return; 
+  }
+
+  if (text === "/cekid") {
+    sendMessage(chatId, "ID untuk chat ini adalah:\n`" + chatId + "`\n\nSilakan copy angka di atas dan masukkan persis seperti itu ke dalam nilai GRUP_CHAT_ID di Script Properties!");
+    return;
   }
 
  if (text === "/tutor") {
@@ -588,6 +595,8 @@ function doPost(e) {
     
     return sendMessage(chatId, "🤝 *DATA PARTNERSHIP DICATAT!* 🤝\n\nInstansi: " + instansi.trim() + "\nBenefit:\n" + benefit.trim() + "\n\nDurasi: " + mulai.trim() + " s/d " + selesai.trim());
   }
+  
+  return ContentService.createTextOutput("OK");
 }
 // ==========================================
 // FUNGSI HELPER BARU (DATABASE & REKAP)
@@ -669,8 +678,21 @@ function updateRekapDelegasi(namaBaku) {
 function sendMessage(chatId, text) {
   var url = "https://api.telegram.org/bot" + token + "/sendMessage";
   var payload = { "chat_id": String(chatId), "text": text, "parse_mode": "Markdown" };
-  var options = { "method": "post", "contentType": "application/json", "payload": JSON.stringify(payload) };
-  try { UrlFetchApp.fetch(url, options); } catch(e) {}
+  var options = { "method": "post", "contentType": "application/json", "payload": JSON.stringify(payload), "muteHttpExceptions": true };
+  try { 
+    var response = UrlFetchApp.fetch(url, options); 
+    var json = JSON.parse(response.getContentText());
+    if (!json.ok) {
+      console.error("Telegram API Error: " + json.description + " | Text: " + text);
+      if (json.description && json.description.indexOf("parse entities") !== -1) {
+         delete payload.parse_mode;
+         options.payload = JSON.stringify(payload);
+         UrlFetchApp.fetch(url, options);
+      }
+    }
+  } catch(e) {
+    console.error("HTTP Fetch Error: " + e.message);
+  }
 }
 
 function prosesDelegasiTag(delegasiString) {
