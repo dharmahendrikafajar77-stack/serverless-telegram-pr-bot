@@ -3,7 +3,7 @@ var token = scriptProperties.getProperty('TELEGRAM_TOKEN');
 var sheetId = scriptProperties.getProperty('SHEET_ID'); 
 var grupChatId = scriptProperties.getProperty('GRUP_CHAT_ID'); 
 var folderId = scriptProperties.getProperty('FOLDER_ID'); 
-var geminiApiKey = scriptProperties.getProperty('GEMINI_API_KEY'); 
+
 function doPost(e) {
   if (!e || !e.postData || !e.postData.contents) return ContentService.createTextOutput("OK");
   var update = JSON.parse(e.postData.contents);
@@ -19,7 +19,6 @@ function doPost(e) {
 
   var chatId = msg.chat.id;
   var text = msg.text || msg.caption || ""; 
-  var teksLower = text.toLowerCase().trim();
   
   // Normalisasi command jika dipanggil via menu pop-up di grup (contoh: /info@UKBAPR_Bot -> /info)
   if (text.startsWith("/")) {
@@ -32,7 +31,7 @@ function doPost(e) {
   }
   
  // 1. KOTAK PANDUAN (/start & /tutor)
-  if (teksLower === "/start" || teksLower === "hey") {
+  if (text === "/start" || text.toLowerCase() === "hey") {
     sendMessage(chatId, "Halo Tim PR! Kenalin, aku *Monalissa* 💅, asisten digital 24 jam kebanggaan divisi PR UKBA.\n\nKetik `/tutor` kalau kamu butuh panduan, atau `/info` untuk lihat daftar undangan ter-update!");
     return; 
   }
@@ -42,7 +41,7 @@ function doPost(e) {
     return;
   }
 
- if (teksLower === "/tutor") {
+ if (text === "/tutor") {
     var tutorText = "📚 *PANDUAN LENGKAP MONALISSA* 📚\n\n" +
       "🔹 `/i` *(Input Undangan Baru)*\nKetik langsung:\n`/i Pengirim, Kegiatan, Tgl/Bln, Jam Menit, Lokasi`\n\n" +
       "🔹 `/a` *(Ambil Delegasi)*\nKetik: `/a ID_Surat Nama_Kamu`\n\n" +
@@ -226,11 +225,8 @@ function doPost(e) {
   }
 
   // 3. BROADCAST DARI ADMIN
-  if (teksLower.startsWith("/broadcast")) {
-    var isiBroadcast = text.replace(new RegExp("^/broadcast\\s*", "i"), "").trim();
-    if (isiBroadcast === "") {
-       return sendMessage(chatId, "❌ *Pesan Broadcast Kosong!*\n\nSilakan ketik pesan yang ingin di-broadcast setelah perintah.\nContoh: `/broadcast Rapat divisi PR besok jam 8 pagi ya!`");
-    }
+  if (text.startsWith("/broadcast ")) {
+    var isiBroadcast = text.replace("/broadcast ", "").trim();
     var sheetUser = SpreadsheetApp.openById(sheetId).getSheetByName("User_Bot");
     var dataUser = sheetUser.getDataRange().getValues();
     var count = 0;
@@ -243,34 +239,6 @@ function doPost(e) {
     }
     sendMessage(chatId, "✅ Pesan broadcast berhasil dikirim ke " + count + " anggota.");
     return;
-  }
-
-  // ==========================================
-  // 🤖 FITUR BARU: AI PENGENALAN UNDANGAN & PERINTAH
-  // ==========================================
-  
-  // Pemicu super ringan: Hanya jalan jika diawali /monalissa atau /ai
-  if (teksLower.startsWith("/monalissa ") || teksLower.startsWith("/ai ")) {
-     
-     sendMessage(chatId, "✨ Perintah di terima, wait ya ✨");
-     
-     // Hapus kata awalan agar AI tidak bingung
-     var textToProcess = text;
-     if (teksLower.startsWith("/monalissa ")) textToProcess = text.substring(11).trim();
-     else if (teksLower.startsWith("/ai ")) textToProcess = text.substring(4).trim();
-     
-     var hasilExtract = extractUndanganWithGemini(textToProcess);
-     
-     if (hasilExtract && hasilExtract.indexOf("ERROR:") !== -1) {
-        return sendMessage(chatId, "⚠️ *Monalissa Bingung:*\n" + hasilExtract.replace("ERROR:", "").trim());
-     } else if (hasilExtract && hasilExtract.indexOf("/") !== -1) {
-        // Ambil string tepat dari tulisan "/" sampai habis (mengabaikan backtick)
-        var idx = hasilExtract.indexOf("/");
-        text = hasilExtract.substring(idx).trim(); 
-        sendMessage(chatId, "⚙️ Mengeksekusi Perintah ✨\n`" + text + "`");
-     } else {
-        return sendMessage(chatId, "❌ Maaf, AI Monalissa gagal merangkai format perintahnya.\n\n*Bocoran Jawaban AI:* " + (hasilExtract || "Kosong/Gagal Connect"));
-     }
   }
 
 // 4. INPUT UNDANGAN BARU (/i) - VERSI ANTI DUPLIKAT
@@ -287,27 +255,6 @@ function doPost(e) {
       sendMessage(chatId, "❌ Format kurang lengkap!\nGunakan: `/i Pengirim, Kegiatan, Tgl/Bln, Jam, Lokasi`");
       return;
     }
-
-    // Merapikan Kapitalisasi Otomatis (Lebih Pintar)
-    function smartTitleCase(str) {
-      var acronyms = ["MKU", "PKM", "LP2M", "GOR", "FIP", "FEB", "UNP", "BEM", "UKK", "UKFF", "UPKK", "UKKPK"];
-      var result = str.toLowerCase().split(/\b/).map(function(word) {
-        var upper = word.toUpperCase();
-        if (acronyms.indexOf(upper) !== -1 || upper.match(/^[A-Z]+\d+[A-Z]*$/)) {
-           return upper; 
-        }
-        if (word === "lantai" || word === "lt") return "Lt.";
-        return (word.charAt(0).toUpperCase() + word.slice(1));
-      }).join('');
-      
-      // Bersihkan dobel spasi atau koma yang jelek di sekitar Lt.
-      result = result.replace(/,\s*Lt\./g, " Lt.").replace(/\s+/g, " ");
-      return result;
-    }
-    
-    data[0] = data[0].toUpperCase();           // Pengirim: UPPERCASE
-    data[1] = smartTitleCase(data[1]);         // Kegiatan: Smart Title Case
-    data[4] = smartTitleCase(data[4]);         // Lokasi: Smart Title Case
     
     var sheet = SpreadsheetApp.openById(sheetId).getSheetByName("Undangan"); 
     
@@ -345,12 +292,7 @@ function doPost(e) {
     
     var waktuTampil = namaHari + " (" + jam + ":" + menit + " WIB) " + tgl + " " + namaBulan;
 
-    // Kolom A adalah nomor urut baris (bukan nomor ID U-xx)
-    // Karena header ada 2 baris, maka nomor urut = baris tujuan - 2
-    var barisTujuan = sheet.getLastRow() + 1;
-    var nomorUrutKolomA = barisTujuan - 2;
-
-    sheet.appendRow([nomorUrutKolomA, idSurat, waktuDiterima, data[0], data[1], waktuSheet, data[4], "", ""]);
+    sheet.appendRow([nomorUrut, idSurat, waktuDiterima, data[0], data[1], waktuSheet, data[4], "", ""]);
     
     var balasan = "🚨 *UNDANGAN BARU MASUK!* 🚨\n\n*ID Surat:* " + idSurat + "\n*UK Pengirim:* " + data[0] + "\n*Kegiatan:* " + data[1] + "\n*Waktu:* " + waktuTampil + "\n*Lokasi:* " + data[4] + "\n\n👥 _Siapa yang bersedia? Balas pesan ini:_ \n`/a " + idSurat + " Nama_Kamu`";
     sendMessage(chatId, balasan);
@@ -1348,98 +1290,16 @@ function hapusDelegasiTanpaBukti() {
                     [{ text: "❌ Hapus Delegasi", callback_data: "DEL_YES|" + idSurat }],
                     [{ text: "✅ Pertahankan", callback_data: "DEL_NO|" + idSurat }]
                 ];
-                var infoDelegasi = prosesDelegasiTag(delegasi);
-                var pesanPeringatan = "⚠️ *PERINGATAN DELEGASI* ⚠️\n\nUndangan *" + idSurat + "* (" + kegiatan + ") sudah lewat dari 3 hari, tetapi delegasi " + infoDelegasi.mentionText + " belum mengunggah foto bukti kehadiran.\n\nApakah delegasi di atas harus dihapus atau dipertahankan? _(Hanya Admin yang dapat memencet tombol)_";
+                var pesanPeringatan = "⚠️ *PERINGATAN DELEGASI* ⚠️\n\nUndangan *" + idSurat + "* (" + kegiatan + ") sudah lewat dari 3 hari, tetapi delegasi *" + delegasi + "* belum mengunggah foto bukti kehadiran.\n\nApakah delegasi di atas harus dihapus atau dipertahankan? _(Hanya Admin yang dapat memencet tombol)_";
                 
                 var url = "https://api.telegram.org/bot" + token + "/sendMessage";
                 var payload = { chat_id: String(grupChatId), text: pesanPeringatan, parse_mode: "Markdown", reply_markup: { inline_keyboard: keyboard } };
                 UrlFetchApp.fetch(url, { method: "post", contentType: "application/json", payload: JSON.stringify(payload) });
-                
-                // Kirim teguran ke DM masing-masing delegasi
-                for (var d = 0; d < infoDelegasi.dmList.length; d++) {
-                   var userTarget = infoDelegasi.dmList[d];
-                   var pesanTeguranDM = "🚨 *TEGURAN DARI MONALISSA* 🚨\n\nHalo *" + userTarget.nama + "*!\n\nKegiatan *" + kegiatan + "* (" + idSurat + ") sudah berlalu lebih dari 3 hari, tapi kamu belum mengunggah foto bukti kehadiran sama sekali.\n\nAyo segera kirim foto dengan caption `/f " + idSurat + "` ke grup atau balas pesan ini. Jika tidak, keikutsertaan delegasimu akan dihapus oleh Admin! 💅";
-                   sendMessage(userTarget.id, pesanTeguranDM);
-                }
              }
           }
        }
     }
   }
-}
-
-// ==========================================
-// 🤖 FUNGSI AI GEMINI (PEMROSES NATURAL LANGUAGE)
-// ==========================================
-function extractUndanganWithGemini(textInput) {
-  if (!geminiApiKey) {
-     return "ERROR: Kunci GEMINI_API_KEY belum dipasang di Script Properties!";
-  }
-  
-  var prompt = "Tugasmu: Analisis pesan berikut dan ubah menjadi SALAH SATU format perintah bot Telegram yang tepat.\n\n" +
-               "PILIHAN FORMAT YANG DIIZINKAN:\n" +
-               "1. Input Undangan: /i Nama Pengirim, Nama Kegiatan, DD/MM, HH:MM, Lokasi\n" +
-               "2. Ambil Delegasi: /a ID_Surat Nama_Kamu\n" +
-               "3. Batal Delegasi: /tarik ID_Surat Nama_Kamu\n" +
-               "4. Hapus Surat: /hapus ID_Surat\n" +
-               "5. Edit Data: /edit ID_Surat Kolom NilaiBaru (Pilihan Kolom: Pengirim/Kegiatan/Waktu/Lokasi)\n" +
-               "6. Upload Foto Bukti: /f ID_Surat\n\n" +
-               "ATURAN SUPER KETAT UNTUK INPUT UNDANGAN BARU (/i):\n" +
-               "- Kamu HARUS mengekstrak 5 data wajib: (Pengirim, Nama Kegiatan, Tanggal, Jam, Lokasi).\n" +
-               "- JIKA ada data yang kurang/tidak disebutkan di pesan asli, JANGAN berikan format /i! Balas dengan: ERROR: Pesan kamu kurang lengkap nih! Tolong sebutkan [sebutkan bagian yang kurang, misal: lokasi acaranya di mana dan jam berapa?] agar Monalissa bisa mencatatnya ke buku tamu 💅\n" +
-               "- Pastikan 'Nama Pengirim' ditulis HURUF BESAR SEMUA (contoh: UKKPK, BEM).\n" +
-               "- Pastikan 'Nama Kegiatan' dan 'Lokasi' menggunakan Huruf Kapital di Awal Kata (Title Case). NAMUN untuk singkatan nama gedung/kampus (seperti MKU, PKM, LP2M, GOR, FIP, FEB, UNP) TETAPKAN SEBAGAI HURUF BESAR. Dan jika ada kata 'lantai', persingkat menjadi 'Lt.' agar rapi.\n\n" +
-               "ATURAN UMUM:\n" +
-               "- Output HARUS HANYA 1 baris yang diawali dengan slash (/) jika pesan lengkap.\n" +
-               "- Jika pesan berisi niat untuk mengunggah atau mengirim 'foto bukti' kehadiran, gunakan format /f ID_Surat (tanpa embel-embel lain).\n" +
-               "- Jika pesan menyatakan ketersediaan hadir/ikut delegasi, gunakan format /a. Ekstrak nama orangnya jika ada, gunakan Huruf Kapital di Awal Kata.\n" +
-               "- Jika pesan menyatakan batal/tidak jadi ikut, gunakan format /tarik.\n" +
-               "- Jika pesan meminta hapus undangan, gunakan format /hapus.\n\n" +
-               "Pesan masuk: \"" + textInput + "\"";
-
-  var payload = {
-    "contents": [{
-      "parts": [{"text": prompt}]
-    }],
-    "generationConfig": {
-       "temperature": 0.1
-    }
-  };
-  
-  var options = {
-    "method": "post",
-    "contentType": "application/json",
-    "payload": JSON.stringify(payload),
-    "muteHttpExceptions": true
-  };
-  
-  // Daftar model yang akan dicoba berurutan jika server sedang kepenuhan (High Demand)
-  var modelsToTry = ["gemini-flash-latest", "gemini-flash-lite-latest", "gemini-pro-latest"];
-  var lastErrorMsg = "";
-
-  for (var i = 0; i < modelsToTry.length; i++) {
-    var url = "https://generativelanguage.googleapis.com/v1beta/models/" + modelsToTry[i] + ":generateContent?key=" + geminiApiKey;
-    
-    try {
-      var response = UrlFetchApp.fetch(url, options);
-      var json = JSON.parse(response.getContentText());
-      
-      if (json.error) {
-         lastErrorMsg = json.error.message;
-         continue; 
-      }
-      
-      if (json.candidates && json.candidates.length > 0) {
-         var rawOutput = json.candidates[0].content.parts[0].text.trim();
-         rawOutput = rawOutput.replace(/```[a-zA-Z]*\n/g, "").replace(/```/g, "").trim();
-         return rawOutput;
-      }
-    } catch(e) {
-      return "ERROR TRY-CATCH: " + e.message;
-    }
-  }
-  
-  return "ERROR API (Semua server Google sedang penuh/sibuk): " + lastErrorMsg;
 }
 
 // ==========================================
