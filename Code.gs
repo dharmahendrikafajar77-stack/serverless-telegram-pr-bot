@@ -4,6 +4,21 @@ var sheetId = scriptProperties.getProperty('SHEET_ID');
 var grupChatId = scriptProperties.getProperty('GRUP_CHAT_ID'); 
 var folderId = scriptProperties.getProperty('FOLDER_ID'); 
 var geminiApiKey = scriptProperties.getProperty('GEMINI_API_KEY'); 
+function smartTitleCase(str) {
+  var acronyms = ["MKU", "PKM", "LP2M", "GOR", "FIP", "FEB", "UNP", "BEM", "UKK", "UKFF", "UPKK", "UKKPK"];
+  var result = str.toLowerCase().split(/\b/).map(function(word) {
+    var upper = word.toUpperCase();
+    if (acronyms.indexOf(upper) !== -1 || upper.match(/^[A-Z]+\d+[A-Z]*$/)) {
+       return upper; 
+    }
+    if (word === "lantai" || word === "lt") return "Lt.";
+    return (word.charAt(0).toUpperCase() + word.slice(1));
+  }).join('');
+  
+  result = result.replace(/,\s*Lt\./g, " Lt.").replace(/\s+/g, " ");
+  return result;
+}
+
 function doPost(e) {
   if (!e || !e.postData || !e.postData.contents) return ContentService.createTextOutput("OK");
   var update = JSON.parse(e.postData.contents);
@@ -288,23 +303,6 @@ function doPost(e) {
       return;
     }
 
-    // Merapikan Kapitalisasi Otomatis (Lebih Pintar)
-    function smartTitleCase(str) {
-      var acronyms = ["MKU", "PKM", "LP2M", "GOR", "FIP", "FEB", "UNP", "BEM", "UKK", "UKFF", "UPKK", "UKKPK"];
-      var result = str.toLowerCase().split(/\b/).map(function(word) {
-        var upper = word.toUpperCase();
-        if (acronyms.indexOf(upper) !== -1 || upper.match(/^[A-Z]+\d+[A-Z]*$/)) {
-           return upper; 
-        }
-        if (word === "lantai" || word === "lt") return "Lt.";
-        return (word.charAt(0).toUpperCase() + word.slice(1));
-      }).join('');
-      
-      // Bersihkan dobel spasi atau koma yang jelek di sekitar Lt.
-      result = result.replace(/,\s*Lt\./g, " Lt.").replace(/\s+/g, " ");
-      return result;
-    }
-    
     data[0] = data[0].toUpperCase();           // Pengirim: UPPERCASE
     data[1] = smartTitleCase(data[1]);         // Kegiatan: Smart Title Case
     data[4] = smartTitleCase(data[4]);         // Lokasi: Smart Title Case
@@ -637,6 +635,10 @@ function doPost(e) {
     var sheetMp = SpreadsheetApp.openById(sheetId).getSheetByName("Medpart"); 
     if (!sheetMp) {
        sheetMp = SpreadsheetApp.openById(sheetId).getSheetByName("Media Partner");
+    }
+    
+    if (!sheetMp) {
+       return sendMessage(chatId, "❌ *Sistem Gagal!*\n\nMonalissa tidak bisa menemukan tab Sheet bernama 'Medpart' atau 'Media Partner'. Tolong pastikan nama tab di Google Sheets sudah benar dan tidak ada spasi berlebih!");
     }
     
     var lastRowMp = sheetMp.getLastRow();
@@ -1615,6 +1617,7 @@ function extractUndanganWithGemini(textInput) {
                "ATURAN SUPER KETAT UNTUK INPUT UNDANGAN BARU (/i):\n" +
                "- Kamu HARUS mengekstrak 5 data wajib: (Pengirim, Nama Kegiatan, Tanggal, Jam, Lokasi).\n" +
                "- JIKA ada data yang kurang/tidak disebutkan di pesan asli, JANGAN berikan format /i! Balas dengan: ERROR: Pesan kamu kurang lengkap nih! Tolong sebutkan [sebutkan bagian yang kurang, misal: lokasi acaranya di mana dan jam berapa?] agar Monalissa bisa mencatatnya ke buku tamu 💅\n" +
+               "- Kamu sangat cerdas, konversi teks waktu apa pun (misal '25 oktober', 'besok', 'jam setengah 3 sore') menjadi format Tanggal DD/MM (misal 25/10) dan Jam HH:MM (misal 14:30).\n" +
                "- Pastikan 'Nama Pengirim' ditulis HURUF BESAR SEMUA (contoh: UKKPK, BEM).\n" +
                "- Pastikan 'Nama Kegiatan' dan 'Lokasi' menggunakan Huruf Kapital di Awal Kata (Title Case). NAMUN untuk singkatan nama gedung/kampus (seperti MKU, PKM, LP2M, GOR, FIP, FEB, UNP) TETAPKAN SEBAGAI HURUF BESAR. Dan jika ada kata 'lantai', persingkat menjadi 'Lt.' agar rapi.\n\n" +
                "ATURAN UMUM:\n" +
