@@ -390,38 +390,47 @@ function doPost(e) {
      return;
   }
 
-  // FITUR HAPUS DATA UNDANGAN (/hapus)
+  // FITUR HAPUS DATA UNDANGAN ATAU MEDPART (/hapus)
   if (text.startsWith("/hapus ")) {
-     var idSuratHapus = text.replace("/hapus ", "").trim().toUpperCase();
-     if (idSuratHapus === "") {
-        return sendMessage(chatId, "❌ *ID Surat belum diisi!*\nContoh: `/hapus U01`");
+     var idHapus = text.replace("/hapus ", "").trim().toUpperCase();
+     if (idHapus === "") {
+        return sendMessage(chatId, "❌ *ID belum diisi!*\nContoh: `/hapus U01` atau `/hapus M01`");
      }
      
-     var sheet = SpreadsheetApp.openById(sheetId).getSheetByName("Undangan");
+     var isMedpart = idHapus.startsWith("M");
+     var namaSheet = isMedpart ? "Medpart" : "Undangan";
+     var headerRows = isMedpart ? 1 : 2;
+     
+     var sheet = SpreadsheetApp.openById(sheetId).getSheetByName(namaSheet);
+     if (!sheet && isMedpart) sheet = SpreadsheetApp.openById(sheetId).getSheetByName("Media Partner");
+     
+     if (!sheet) return sendMessage(chatId, "❌ Sheet " + namaSheet + " tidak ditemukan.");
+     
      var dataAll = sheet.getDataRange().getValues();
      var barisDitemukan = -1;
      
      for (var i = 0; i < dataAll.length; i++) {
-        if (dataAll[i][1] === idSuratHapus) { barisDitemukan = i + 1; break; }
+        if (dataAll[i][1] === idHapus) { barisDitemukan = i + 1; break; }
      }
      
      if (barisDitemukan !== -1) {
         sheet.deleteRow(barisDitemukan);
         
-        // Update Penomoran Otomatis
+        // Update Penomoran Otomatis (Kolom NO)
         var lastRow = sheet.getLastRow();
-        var numRows = lastRow - 2; // Asumsi baris 1 & 2 adalah header
+        var numRows = lastRow - headerRows; 
         if (numRows > 0) {
            var newNumbers = [];
            for (var r = 1; r <= numRows; r++) {
               newNumbers.push([r]);
            }
-           sheet.getRange(3, 1, numRows, 1).setValues(newNumbers);
+           sheet.getRange(headerRows + 1, 1, numRows, 1).setValues(newNumbers);
         }
         
-        sendMessage(chatId, "✅ Data surat *" + idSuratHapus + "* berhasil dihapus secara permanen dan penomoran telah disesuaikan. 💅");
+        var jenis = isMedpart ? "Media Partner" : "Undangan";
+        sendMessage(chatId, "✅ Data " + jenis + " *" + idHapus + "* berhasil dihapus secara permanen dan penomoran (NO) telah dirapikan kembali. 💅");
      } else {
-        sendMessage(chatId, "❌ ID Surat *" + idSuratHapus + "* tidak ditemukan.");
+        sendMessage(chatId, "❌ ID *" + idHapus + "* tidak ditemukan di database " + (isMedpart ? "Medpart" : "Undangan") + ".");
      }
      return;
   }
@@ -520,8 +529,8 @@ function doPost(e) {
      return;
   }
 
- // 6. UPLOAD BUKTI FOTO (/f)
-  if (text.startsWith("/f")) {
+  // 6. UPLOAD BUKTI FOTO KEHADIRAN UNDANGAN (/f)
+  if (text.startsWith("/f ") || text === "/f") {
     if (!msg.photo) {
        return sendMessage(chatId, "❌ *Foto tidak terdeteksi!*\n\nKamu harus mengirimkan foto bukti kehadiran bersamaan dengan perintah ini di kolom caption.\nContoh caption: `/f U01`");
     }
@@ -561,22 +570,16 @@ function doPost(e) {
   }
 
   // ==========================================
-  // FITUR MEDIA PARTNER (/mp) - UPDATE TANGGAL UPLOAD
+  // FITUR UPLOAD POSTER MEDIA PARTNER (/fmp)
   // ==========================================
-  if (text.startsWith("/mp")) {
+  if (text.startsWith("/fmp")) {
     if (!msg.photo) {
-       return sendMessage(chatId, "❌ *Poster tidak terdeteksi!*\n\nKirim foto poster, lalu salin dan isi template ini di kolom caption:\n\n`/mp\nInstansi: \nTanggal Upload: `");
-    }
-
-    var instansi = (text.match(/Instansi:\s*([^\n]+)/i) || [])[1];
-    var waktu = (text.match(/Tanggal Upload:\s*([^\n]+)/i) || 
-                 text.match(/Tanggal:\s*([^\n]+)/i) || 
-                 text.match(/Waktu:\s*([^\n]+)/i) || [])[1];
-
-    if (!instansi || !waktu) {
-      return sendMessage(chatId, "❌ *Format salah!*\n\nSalin dan isi template ini di kolom caption foto:\n\n`/mp\nInstansi: \nTanggal Upload: `");
+       return sendMessage(chatId, "❌ *Foto Poster tidak terdeteksi!*\n\nKamu harus mengirimkan foto poster final beserta caption: `/fmp ID_Medpart` (Contoh: `/fmp M01`)");
     }
     
+    var idMpFoto = text.replace("/fmp", "").trim().toUpperCase();
+    if (idMpFoto === "") return sendMessage(chatId, "❌ Format salah! Jangan lupa masukkan ID Medpart.\nContoh caption: `/fmp M01`");
+
     var fileIdTelegram = msg.photo[msg.photo.length - 1].file_id;
     var fileDataUrl = "https://api.telegram.org/bot" + token + "/getFile?file_id=" + fileIdTelegram;
     var response = UrlFetchApp.fetch(fileDataUrl);
@@ -589,18 +592,71 @@ function doPost(e) {
     savedFile.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
     var directImageUrl = "https://drive.google.com/uc?export=view&id=" + savedFile.getId();
     
-    var sheetMp = SpreadsheetApp.openById(sheetId).getSheetByName("Media Partner"); 
-    var lastRowMp = sheetMp.getLastRow();
-    var nomorUrut = lastRowMp < 2 ? 1 : lastRowMp - 1; 
+    var sheetMp = SpreadsheetApp.openById(sheetId).getSheetByName("Medpart") || SpreadsheetApp.openById(sheetId).getSheetByName("Media Partner");
+    var dataAll = sheetMp.getDataRange().getValues();
+    var barisDitemukan = -1;
+    for (var i = 0; i < dataAll.length; i++) {
+        // Kolom kedua (index 1) adalah ID Medpart
+        if (dataAll[i][1] === idMpFoto) { barisDitemukan = i + 1; break; }
+    }
     
-    var tglRaw = waktu.trim().split(/[-/]/);
-    var tglFixed = (tglRaw[0] ? tglRaw[0].trim().padStart(2, '0') : "01") + "/" + (tglRaw[1] ? tglRaw[1].trim().padStart(2, '0') : "01");
+    if(barisDitemukan !== -1) {
+      // Kolom ke-8 adalah Poster
+      sheetMp.getRange(barisDitemukan, 8).setFormula('=IMAGE("' + directImageUrl + '")');
+      sendMessage(chatId, "📸 *Poster Media Partner Berhasil Disimpan!*\n\nKerja bagus! Poster final untuk " + idMpFoto + " sudah diamankan oleh Monalissa.\n\n_Pastikan kamu segera meneruskan (forward) pesan berisi poster ini ke Divisi Design and Media ya!_ 💅");
+    } else {
+      sendMessage(chatId, "❌ Foto gagal diproses: ID Medpart *" + idMpFoto + "* tidak ditemukan di database.");
+    }
+    return;
+  }
 
-    // Kolom 3 sekarang adalah "Tanggal Upload" sesuai perubahan di Sheet
-    sheetMp.appendRow([nomorUrut, instansi.trim(), tglFixed, ""]);
-    sheetMp.getRange(lastRowMp + 1, 4).setFormula('=IMAGE("' + directImageUrl + '")');
+  // ==========================================
+  // FITUR MEDIA PARTNER (/mp) - FORMAT TABEL BARU (8 KOLOM)
+  // ==========================================
+  if (text.startsWith("/mp")) {
+    var instansi = (text.match(/Instansi:\s*([^\n]+)/i) || [])[1];
+    var cp = (text.match(/Cp:\s*([^\n]+)/i) || text.match(/Contact Person:\s*([^\n]+)/i) || [])[1];
+    var waktu = (text.match(/Tanggal Upload:\s*([^\n]+)/i) || 
+                 text.match(/Tanggal:\s*([^\n]+)/i) || 
+                 text.match(/Waktu:\s*([^\n]+)/i) || [])[1];
+    var linkBukti = (text.match(/Link Bukti:\s*([^\n]+)/i) || 
+                     text.match(/Bukti:\s*([^\n]+)/i) || [])[1];
+
+    if (!instansi) {
+      return sendMessage(chatId, "❌ *Format salah!*\n\nMinimal kamu harus mencantumkan Nama Instansi. Silakan gunakan template ini:\n\n`/mp\nInstansi: \nCp: \nTanggal Upload: \nLink Bukti: `");
+    }
     
-    return sendMessage(chatId, "✅ *DATA MEDIA PARTNER DICATAT!* 💅\n\nInstansi: " + instansi.trim() + "\nTanggal Upload: " + tglFixed + "\nPoster berhasil dipajang di database.");
+    // Jika data tidak ada, isi dengan default text
+    var cpFinal = (cp && cp.trim() !== "") ? cp.trim() : "Menunggu Syarat";
+    var waktuFinal = (waktu && waktu.trim() !== "" && waktu.trim().toLowerCase() !== "menunggu syarat") ? waktu.trim() : "Menunggu Syarat";
+    var linkBuktiFinal = (linkBukti && linkBukti.trim() !== "") ? linkBukti.trim() : "Belum Ada";
+
+    // Gunakan fungsi smartTitleCase agar nama Instansi otomatis rapi!
+    var instansiRapi = smartTitleCase(instansi);
+    
+    var sheetMp = SpreadsheetApp.openById(sheetId).getSheetByName("Medpart"); 
+    if (!sheetMp) {
+       sheetMp = SpreadsheetApp.openById(sheetId).getSheetByName("Media Partner");
+    }
+    
+    var lastRowMp = sheetMp.getLastRow();
+    
+    // Sistem ID Unik (Baca kolom A/NO atau otomatis +1)
+    var newIdNumber = lastRowMp < 2 ? 1 : lastRowMp; 
+    var newId = "M" + String(newIdNumber).padStart(2, '0');
+    
+    var tglFixed = waktuFinal;
+    if (waktuFinal !== "Menunggu Syarat") {
+        var tglRaw = waktuFinal.split(/[-/]/);
+        if (tglRaw.length >= 2) {
+            tglFixed = (tglRaw[0] ? tglRaw[0].trim().padStart(2, '0') : "01") + "/" + (tglRaw[1] ? tglRaw[1].trim().padStart(2, '0') : "01");
+        }
+    }
+
+    // Urutan kolom: NO (1), ID Medpart (2), Tgl Masuk (3), Instansi (4), Cp (5), Tgl Upload (6), Bukti (7), Poster (8)
+    sheetMp.appendRow([newIdNumber, newId, new Date(), instansiRapi, cpFinal, tglFixed, linkBuktiFinal, ""]); 
+    
+    return sendMessage(chatId, "✅ *DATA MEDIA PARTNER DICATAT!* 💅\n\n*ID Medpart:* " + newId + "\n*Instansi:* " + instansiRapi + "\n*Tanggal Upload:* " + tglFixed + "\n\n_Catatan: Jika Poster Final sudah selesai direvisi oleh mereka, jangan lupa upload fotonya ke Monalissa dengan caption `/fmp " + newId + "` ya!_");
   }
 
   // ==========================================
@@ -1032,6 +1088,57 @@ function handleCallback(callbackQuery) {
      UrlFetchApp.fetch("https://api.telegram.org/bot" + token + "/answerCallbackQuery?callback_query_id=" + callbackQuery.id);
      return;
   }
+  
+  if (action === "DELMP_YES" || action === "DELMP_NO") {
+     var checkUrl = "https://api.telegram.org/bot" + token + "/getChatMember?chat_id=" + grupChatId + "&user_id=" + userIdCallback;
+     var checkResponse = UrlFetchApp.fetch(checkUrl, {muteHttpExceptions: true});
+     var checkData = JSON.parse(checkResponse.getContentText());
+     var isAdmin = false;
+     if (checkData.ok && (checkData.result.status === "administrator" || checkData.result.status === "creator")) {
+         isAdmin = true;
+     }
+     
+     if (!isAdmin) {
+         UrlFetchApp.fetch("https://api.telegram.org/bot" + token + "/answerCallbackQuery?callback_query_id=" + callbackQuery.id + "&text=❌ Akses ditolak. Anda bukan Admin Grup!&show_alert=true");
+         return;
+     }
+     
+     var idMp = parts[1];
+     var sheetMp = SpreadsheetApp.openById(sheetId).getSheetByName("Medpart") || SpreadsheetApp.openById(sheetId).getSheetByName("Media Partner");
+     var dataAll = sheetMp.getDataRange().getValues();
+     var barisDitemukan = -1;
+     var instansi = "";
+     
+     for (var i = 0; i < dataAll.length; i++) {
+        // Kolom kedua (index 1) adalah ID Medpart, kolom keempat (index 3) adalah Instansi
+        if (dataAll[i][1] === idMp) { barisDitemukan = i + 1; instansi = dataAll[i][3]; break; }
+     }
+     
+     if (barisDitemukan !== -1) {
+        if (action === "DELMP_YES") {
+           sheetMp.deleteRow(barisDitemukan);
+           var payloadEdit = {
+               chat_id: String(chatId),
+               message_id: messageId,
+               text: "🧹 Data Media Partner *" + instansi + "* (" + idMp + ") telah **DIHAPUS/DIBATALKAN** dari sistem oleh Admin.",
+               parse_mode: "Markdown"
+           };
+           UrlFetchApp.fetch("https://api.telegram.org/bot" + token + "/editMessageText", { method: "post", contentType: "application/json", payload: JSON.stringify(payloadEdit) });
+        } else if (action === "DELMP_NO") {
+           // Reset Tgl Masuk (kolom 3) ke hari ini agar mendapatkan perpanjangan waktu penuh
+           sheetMp.getRange(barisDitemukan, 3).setValue(new Date()); 
+           var payloadEdit = {
+               chat_id: String(chatId),
+               message_id: messageId,
+               text: "✅ Data Media Partner *" + instansi + "* (" + idMp + ") **DIPERTAHANKAN**. Tanggal Masuk telah di-reset ulang ke hari ini oleh Admin.",
+               parse_mode: "Markdown"
+           };
+           UrlFetchApp.fetch("https://api.telegram.org/bot" + token + "/editMessageText", { method: "post", contentType: "application/json", payload: JSON.stringify(payloadEdit) });
+        }
+     }
+     UrlFetchApp.fetch("https://api.telegram.org/bot" + token + "/answerCallbackQuery?callback_query_id=" + callbackQuery.id);
+     return;
+  }
 
   // Matikan efek loading di tombol Telegram untuk action lain
   UrlFetchApp.fetch("https://api.telegram.org/bot" + token + "/answerCallbackQuery?callback_query_id=" + callbackQuery.id);
@@ -1226,6 +1333,56 @@ function handleCallback(callbackQuery) {
      UrlFetchApp.fetch("https://api.telegram.org/bot" + token + "/answerCallbackQuery?callback_query_id=" + callbackQuery.id);
      return;
   }
+  
+  if (action === "DELMP_YES" || action === "DELMP_NO") {
+     var checkUrl = "https://api.telegram.org/bot" + token + "/getChatMember?chat_id=" + grupChatId + "&user_id=" + userIdCallback;
+     var checkResponse = UrlFetchApp.fetch(checkUrl, {muteHttpExceptions: true});
+     var checkData = JSON.parse(checkResponse.getContentText());
+     var isAdmin = false;
+     if (checkData.ok && (checkData.result.status === "administrator" || checkData.result.status === "creator")) {
+         isAdmin = true;
+     }
+     
+     if (!isAdmin) {
+         UrlFetchApp.fetch("https://api.telegram.org/bot" + token + "/answerCallbackQuery?callback_query_id=" + callbackQuery.id + "&text=" + encodeURIComponent("❌ Akses ditolak. Anda bukan Admin Grup!") + "&show_alert=true");
+         return;
+     }
+     
+     var idMp = parts[1];
+     var sheetMp = SpreadsheetApp.openById(sheetId).getSheetByName("Medpart") || SpreadsheetApp.openById(sheetId).getSheetByName("Media Partner");
+     var dataAll = sheetMp.getDataRange().getValues();
+     var barisDitemukan = -1;
+     var instansi = "";
+     
+     for (var i = 0; i < dataAll.length; i++) {
+        if (dataAll[i][0] === idMp) { barisDitemukan = i + 1; instansi = dataAll[i][1]; break; }
+     }
+     
+     if (barisDitemukan !== -1) {
+        if (action === "DELMP_YES") {
+           sheetMp.deleteRow(barisDitemukan);
+           var payloadEdit = {
+               chat_id: String(chatId),
+               message_id: messageId,
+               text: "🧹 Data Media Partner *" + instansi + "* (" + idMp + ") telah **DIHAPUS** dari sistem oleh Admin.",
+               parse_mode: "Markdown"
+           };
+           UrlFetchApp.fetch("https://api.telegram.org/bot" + token + "/editMessageText", { method: "post", contentType: "application/json", payload: JSON.stringify(payloadEdit) });
+        } else if (action === "DELMP_NO") {
+           sheetMp.getRange(barisDitemukan, 6).setValue(new Date()); 
+           var payloadEdit = {
+               chat_id: String(chatId),
+               message_id: messageId,
+               text: "✅ Data Media Partner *" + instansi + "* (" + idMp + ") **DIPERTAHANKAN**. Waktu tenggang telah di-reset ulang oleh Admin.",
+               parse_mode: "Markdown"
+           };
+           UrlFetchApp.fetch("https://api.telegram.org/bot" + token + "/editMessageText", { method: "post", contentType: "application/json", payload: JSON.stringify(payloadEdit) });
+        }
+     }
+     UrlFetchApp.fetch("https://api.telegram.org/bot" + token + "/answerCallbackQuery?callback_query_id=" + callbackQuery.id);
+     return;
+  }
+
 
   // Matikan efek loading di tombol Telegram untuk action lain
   UrlFetchApp.fetch("https://api.telegram.org/bot" + token + "/answerCallbackQuery?callback_query_id=" + callbackQuery.id);
@@ -1368,6 +1525,75 @@ function hapusDelegasiTanpaBukti() {
   }
 }
 
+function reminderMedpart() {
+  var sheet = SpreadsheetApp.openById(sheetId).getSheetByName("Medpart") || SpreadsheetApp.openById(sheetId).getSheetByName("Media Partner");
+  if (!sheet) return;
+  var data = sheet.getDataRange().getValues();
+  
+  var hariIni = new Date();
+  hariIni.setHours(0,0,0,0);
+  
+  var listBelumSyarat = [];
+  var listBelumPoster = [];
+  
+  for (var i = 1; i < data.length; i++) {
+    // Mapping ke tabel 8 kolom: NO(0), ID(1), TglMasuk(2), Instansi(3), Cp(4), TglUpload(5), Bukti(6), Poster(7)
+    var idMp = data[i][1];
+    var tglMasuk = data[i][2];
+    var instansi = data[i][3];
+    var cp = data[i][4];
+    var tglUpload = String(data[i][5] || "").trim();
+    var bukti = String(data[i][6] || "").trim();
+    var poster = String(data[i][7] || "").trim();
+    
+    if (!idMp || !instansi) continue;
+    
+    var tglMulai = (tglMasuk instanceof Date) ? new Date(tglMasuk.getTime()) : new Date(); 
+    tglMulai.setHours(0,0,0,0);
+    var selisihHari = Math.floor((hariIni.getTime() - tglMulai.getTime()) / (1000 * 3600 * 24));
+    
+    var syaratKosong = (bukti === "" || bukti.toLowerCase() === "belum ada" || bukti.toLowerCase() === "menunggu syarat");
+    var posterKosong = (poster === "");
+    var tglKosong = (tglUpload === "" || tglUpload.toLowerCase() === "menunggu syarat");
+
+    if (syaratKosong) {
+      if (selisihHari > 14) {
+        var keyboard = [
+            [{ text: "❌ Hapus Medpart", callback_data: "DELMP_YES|" + idMp }],
+            [{ text: "✅ Tahan Sementara", callback_data: "DELMP_NO|" + idMp }]
+        ];
+        var pesanHapus = "🚨 *PERINGATAN KRITIS MEDPART* 🚨\n\nInstansi *" + instansi + "* (" + idMp + ") sepertinya *ghosting*!\n\n*Alasan:* Syarat (Link Bukti) sama sekali tidak dipenuhi selama lebih dari 14 hari sejak mendaftar.\n\nApakah antrean Medpart ini harus dihapus dari database? _(Hanya Admin)_";
+        var url = "https://api.telegram.org/bot" + token + "/sendMessage";
+        var payload = { chat_id: String(grupChatId), text: pesanHapus, parse_mode: "Markdown", reply_markup: { inline_keyboard: keyboard } };
+        UrlFetchApp.fetch(url, { method: "post", contentType: "application/json", payload: JSON.stringify(payload) });
+      } else {
+        listBelumSyarat.push("🔹 *" + idMp + "* - " + instansi + " (H+" + selisihHari + ")");
+      }
+    } else if (posterKosong || tglKosong) {
+      if (selisihHari > 17) {
+        var keyboard = [
+            [{ text: "❌ Batalkan Medpart", callback_data: "DELMP_YES|" + idMp }],
+            [{ text: "✅ Tetap Proses", callback_data: "DELMP_NO|" + idMp }]
+        ];
+        var pesanHapus = "⚠️ *KONFIRMASI MEDPART TERTUNDA* ⚠️\n\nInstansi *" + instansi + "* (" + idMp + ") sudah memenuhi syarat, tapi sudah " + selisihHari + " hari Poster Final belum juga dikirim.\n\nKarena syarat sudah terpenuhi, slot ini tidak dihapus otomatis. Apakah kalian masih ingin memproses instansi ini? _(Hanya Admin)_";
+        var url = "https://api.telegram.org/bot" + token + "/sendMessage";
+        var payload = { chat_id: String(grupChatId), text: pesanHapus, parse_mode: "Markdown", reply_markup: { inline_keyboard: keyboard } };
+        UrlFetchApp.fetch(url, { method: "post", contentType: "application/json", payload: JSON.stringify(payload) });
+      } else {
+        listBelumPoster.push("🔹 *" + idMp + "* - " + instansi + " (H+" + selisihHari + ")");
+      }
+    }
+  }
+  
+  if (listBelumSyarat.length > 0) {
+    sendMessage(grupChatId, "⚠️ *REMINDER SYARAT MEDPART* ⚠️\n\nBeberapa instansi berikut belum melengkapi syarat sejak didaftarkan. Harap segera di-follow up agar statusnya tidak digantung!\n\n" + listBelumSyarat.join("\n"));
+  }
+  
+  if (listBelumPoster.length > 0) {
+    sendMessage(grupChatId, "⏳ *REMINDER POSTER MEDPART* ⏳\n\nInstansi berikut sudah memenuhi syarat, tapi Poster Final-nya masih belum diterima. Ayo kejar pihak eksternalnya!\n\n" + listBelumPoster.join("\n"));
+  }
+}
+
 // ==========================================
 // 🤖 FUNGSI AI GEMINI (PEMROSES NATURAL LANGUAGE)
 // ==========================================
@@ -1383,15 +1609,19 @@ function extractUndanganWithGemini(textInput) {
                "3. Batal Delegasi: /tarik ID_Surat Nama_Kamu\n" +
                "4. Hapus Surat: /hapus ID_Surat\n" +
                "5. Edit Data: /edit ID_Surat Kolom NilaiBaru (Pilihan Kolom: Pengirim/Kegiatan/Waktu/Lokasi)\n" +
-               "6. Upload Foto Bukti: /f ID_Surat\n\n" +
+               "6. Upload Foto Bukti: /f ID_Surat\n" +
+               "7. Input Media Partner: /mp\\nInstansi: NamaInstansi\\nCp: NamaAtauNomor\\nTanggal Upload: DD/MM\\nLink Bukti: LinkGDrive\n" +
+               "8. Upload Poster Media Partner: /fmp ID_Medpart\n\n" +
                "ATURAN SUPER KETAT UNTUK INPUT UNDANGAN BARU (/i):\n" +
                "- Kamu HARUS mengekstrak 5 data wajib: (Pengirim, Nama Kegiatan, Tanggal, Jam, Lokasi).\n" +
                "- JIKA ada data yang kurang/tidak disebutkan di pesan asli, JANGAN berikan format /i! Balas dengan: ERROR: Pesan kamu kurang lengkap nih! Tolong sebutkan [sebutkan bagian yang kurang, misal: lokasi acaranya di mana dan jam berapa?] agar Monalissa bisa mencatatnya ke buku tamu 💅\n" +
                "- Pastikan 'Nama Pengirim' ditulis HURUF BESAR SEMUA (contoh: UKKPK, BEM).\n" +
                "- Pastikan 'Nama Kegiatan' dan 'Lokasi' menggunakan Huruf Kapital di Awal Kata (Title Case). NAMUN untuk singkatan nama gedung/kampus (seperti MKU, PKM, LP2M, GOR, FIP, FEB, UNP) TETAPKAN SEBAGAI HURUF BESAR. Dan jika ada kata 'lantai', persingkat menjadi 'Lt.' agar rapi.\n\n" +
                "ATURAN UMUM:\n" +
-               "- Output HARUS HANYA 1 baris yang diawali dengan slash (/) jika pesan lengkap.\n" +
-               "- Jika pesan berisi niat untuk mengunggah atau mengirim 'foto bukti' kehadiran, gunakan format /f ID_Surat (tanpa embel-embel lain).\n" +
+               "- Output HARUS HANYA format baku yang diawali dengan slash (/) jika pesan lengkap.\n" +
+               "- Jika pesan berisi niat untuk mengunggah 'foto bukti kehadiran undangan', gunakan format /f ID_Surat (tanpa embel-embel lain).\n" +
+               "- Jika pesan berisi niat untuk mengunggah 'foto poster media partner/medpart', gunakan format /fmp ID_Medpart.\n" +
+               "- Jika pesan berisi informasi awal pendaftaran media partner baru, gunakan format /mp diikuti baris baru (Instansi: ..., Cp: ..., Tanggal Upload: ..., dan Link Bukti: ...). Jika ada yang belum ada, tulis 'Menunggu Syarat'.\n" +
                "- Jika pesan menyatakan ketersediaan hadir/ikut delegasi, gunakan format /a. Ekstrak nama orangnya jika ada, gunakan Huruf Kapital di Awal Kata.\n" +
                "- Jika pesan menyatakan batal/tidak jadi ikut, gunakan format /tarik.\n" +
                "- Jika pesan meminta hapus undangan, gunakan format /hapus.\n\n" +
