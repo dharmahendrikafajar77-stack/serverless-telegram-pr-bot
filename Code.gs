@@ -21,7 +21,19 @@ function smartTitleCase(str) {
 
 function doPost(e) {
   if (!e || !e.postData || !e.postData.contents) return ContentService.createTextOutput("OK");
-  var update = JSON.parse(e.postData.contents);
+  
+  try {
+    var update = JSON.parse(e.postData.contents);
+    processUpdate(update);
+  } catch (error) {
+    console.error("Terjadi error saat memproses update: " + error.message);
+  }
+  
+  // WAJIB: Selalu kembalikan HTTP 200 OK agar Telegram tidak macet/queue stuck!
+  return ContentService.createTextOutput("OK");
+}
+
+function processUpdate(update) {
   
   if (update.callback_query) {
     handleCallback(update.callback_query);
@@ -771,7 +783,6 @@ function doPost(e) {
     return sendMessage(chatId, "🤝 *DATA PARTNERSHIP DICATAT!* 🤝\n\nInstansi: " + instansi.trim() + "\nBenefit:\n" + benefit.trim() + "\n\nDurasi: " + mulai.trim() + " s/d " + selesai.trim());
   }
   
-  return ContentService.createTextOutput("OK");
 }
 // ==========================================
 // FUNGSI HELPER BARU (DATABASE & REKAP)
