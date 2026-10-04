@@ -4,6 +4,7 @@ var sheetId = scriptProperties.getProperty('SHEET_ID');
 var grupChatId = scriptProperties.getProperty('GRUP_CHAT_ID'); 
 var folderId = scriptProperties.getProperty('FOLDER_ID'); 
 var geminiApiKey = scriptProperties.getProperty('GEMINI_API_KEY'); 
+var webAppUrlProperty = scriptProperties.getProperty('WEBHOOK_URL'); 
 function smartTitleCase(str) {
   var acronyms = ["MKU", "PKM", "LP2M", "GOR", "FIP", "FEB", "UNP", "BEM", "UKK", "UKFF", "UPKK", "UKKPK"];
   var result = str.toLowerCase().split(/\b/).map(function(word) {
@@ -1771,14 +1772,11 @@ function checkWebhookStatus() {
 }
 
 function resetWebhook(customUrl) {
-  // ⬇️ PASTE URL WEB APP BARU ANDA DI ANTARA TANDA KUTIP DI BAWAH INI ⬇️
-  var webAppUrl = "PASTE_URL_DISINI";
+  // Secara otomatis mengambil URL dari Script Properties (Key: WEBHOOK_URL)
+  var finalUrl = customUrl ? customUrl : webAppUrlProperty;
   
-  // (Jangan ubah kode di bawah ini)
-  var finalUrl = customUrl ? customUrl : webAppUrl;
-  
-  if (finalUrl === "PASTE_URL_DISINI" || finalUrl === "") {
-    Logger.log("❌ ERROR: Anda belum memasukkan URL Web App yang baru!");
+  if (!finalUrl || finalUrl === "") {
+    Logger.log("❌ ERROR: Anda belum memasang WEBHOOK_URL di Script Properties!");
     return;
   }
 
