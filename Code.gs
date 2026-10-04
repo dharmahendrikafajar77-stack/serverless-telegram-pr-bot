@@ -59,6 +59,35 @@ function processUpdate(update) {
      }
   }
   
+  // ==========================================
+  // 🤖 FITUR BARU: AI PENGENALAN UNDANGAN & PERINTAH
+  // ==========================================
+  
+  // Pemicu super ringan: Hanya jalan jika diawali /monalissa atau /ai
+  if (teksLower.startsWith("/monalissa ") || teksLower.startsWith("/ai ")) {
+     
+     sendMessage(chatId, "✨ Perintah di terima, wait ya ✨");
+     
+     // Hapus kata awalan agar AI tidak bingung
+     var textToProcess = text;
+     if (teksLower.startsWith("/monalissa ")) textToProcess = text.substring(11).trim();
+     else if (teksLower.startsWith("/ai ")) textToProcess = text.substring(4).trim();
+     
+     var hasilExtract = extractUndanganWithGemini(textToProcess);
+     
+     if (hasilExtract && hasilExtract.indexOf("ERROR:") !== -1) {
+        return sendMessage(chatId, "⚠️ *Monalissa Bingung:*\n" + hasilExtract.replace("ERROR:", "").trim());
+     } else if (hasilExtract && hasilExtract.indexOf("/") !== -1) {
+        // Ambil string tepat dari tulisan "/" sampai habis (mengabaikan backtick)
+        var idx = hasilExtract.indexOf("/");
+        text = hasilExtract.substring(idx).trim(); 
+        teksLower = text.toLowerCase().trim(); // Update teksLower juga agar if statement di bawahnya berfungsi!
+        sendMessage(chatId, "⚙️ Mengeksekusi Perintah ✨\n`" + text + "`");
+     } else {
+        return sendMessage(chatId, "❌ Maaf, AI Monalissa gagal merangkai format perintahnya.\n\n*Bocoran Jawaban AI:* " + (hasilExtract || "Kosong/Gagal Connect"));
+     }
+  }
+
  // 1. KOTAK PANDUAN (/start & /tutor)
   if (teksLower === "/start" || teksLower === "hey") {
     sendMessage(chatId, "Halo Tim PR! Kenalin, aku *Monalissa* 💅, asisten digital 24 jam kebanggaan divisi PR UKBA.\n\nKetik `/tutor` kalau kamu butuh panduan, atau `/info` untuk lihat daftar undangan ter-update!");
@@ -319,33 +348,6 @@ function processUpdate(update) {
     return;
   }
 
-  // ==========================================
-  // 🤖 FITUR BARU: AI PENGENALAN UNDANGAN & PERINTAH
-  // ==========================================
-  
-  // Pemicu super ringan: Hanya jalan jika diawali /monalissa atau /ai
-  if (teksLower.startsWith("/monalissa ") || teksLower.startsWith("/ai ")) {
-     
-     sendMessage(chatId, "✨ Perintah di terima, wait ya ✨");
-     
-     // Hapus kata awalan agar AI tidak bingung
-     var textToProcess = text;
-     if (teksLower.startsWith("/monalissa ")) textToProcess = text.substring(11).trim();
-     else if (teksLower.startsWith("/ai ")) textToProcess = text.substring(4).trim();
-     
-     var hasilExtract = extractUndanganWithGemini(textToProcess);
-     
-     if (hasilExtract && hasilExtract.indexOf("ERROR:") !== -1) {
-        return sendMessage(chatId, "⚠️ *Monalissa Bingung:*\n" + hasilExtract.replace("ERROR:", "").trim());
-     } else if (hasilExtract && hasilExtract.indexOf("/") !== -1) {
-        // Ambil string tepat dari tulisan "/" sampai habis (mengabaikan backtick)
-        var idx = hasilExtract.indexOf("/");
-        text = hasilExtract.substring(idx).trim(); 
-        sendMessage(chatId, "⚙️ Mengeksekusi Perintah ✨\n`" + text + "`");
-     } else {
-        return sendMessage(chatId, "❌ Maaf, AI Monalissa gagal merangkai format perintahnya.\n\n*Bocoran Jawaban AI:* " + (hasilExtract || "Kosong/Gagal Connect"));
-     }
-  }
 
 // 4. INPUT UNDANGAN BARU (/i) - VERSI ANTI DUPLIKAT
   if (text.startsWith("/i")) {
@@ -1685,7 +1687,8 @@ function extractUndanganWithGemini(textInput) {
                "6. Upload Foto Bukti: /f ID_Surat\n" +
                "7. Input Media Partner: /mp\\nInstansi: NamaInstansi\\nCp: NamaAtauNomor\\nTanggal Upload: DD/MM\\nLink Bukti: LinkGDrive\n" +
                "8. Upload Poster Media Partner: /fmp ID_Medpart\n" +
-               "9. Cek Status Medpart: /info medpart\n\n" +
+               "9. Cek Status Medpart: /info medpart\n" +
+               "10. Cek Status Undangan: /info (jadwal mendatang), /info semua (seluruh data), atau /info bulan [nama_bulan]\n\n" +
                "ATURAN SUPER KETAT UNTUK INPUT UNDANGAN BARU (/i):\n" +
                "- Kamu HARUS mengekstrak 5 data wajib: (Pengirim, Nama Kegiatan, Tanggal, Jam, Lokasi).\n" +
                "- JIKA ada data yang kurang/tidak disebutkan di pesan asli, JANGAN berikan format /i! Balas dengan: ERROR: Pesan kamu kurang lengkap nih! Tolong sebutkan [sebutkan bagian yang kurang, misal: lokasi acaranya di mana dan jam berapa?] agar Monalissa bisa mencatatnya ke buku tamu 💅\n" +
@@ -1694,6 +1697,7 @@ function extractUndanganWithGemini(textInput) {
                "- Pastikan 'Nama Kegiatan' dan 'Lokasi' menggunakan Huruf Kapital di Awal Kata (Title Case). NAMUN untuk singkatan nama gedung/kampus (seperti MKU, PKM, LP2M, GOR, FIP, FEB, UNP) TETAPKAN SEBAGAI HURUF BESAR. Dan jika ada kata 'lantai', persingkat menjadi 'Lt.' agar rapi.\n\n" +
                "ATURAN UMUM:\n" +
                "- Output HARUS HANYA format baku yang diawali dengan slash (/) jika pesan lengkap.\n" +
+               "- JIKA pesan meminta untuk mengecek jadwal undangan, gunakan format: /info (jika umum), /info semua (jika meminta semua waktu), atau /info bulan nama_bulan (jika meminta bulan spesifik).\n" +
                "- JIKA pesan meminta untuk mengecek status, rekap, daftar, atau menanyakan kabar media partner (medpart), gunakan format: /info medpart\n" +
                "- JIKA pesan berisi kalimat mengirimkan/menyerahkan Link GDrive untuk Bukti Syarat Medpart yang sudah ada, gunakan format: /edit ID_Medpart Bukti LinkGdrive-nya\n" +
                "- Jika pesan berisi niat untuk mengunggah 'foto bukti kehadiran undangan', gunakan format /f ID_Surat (tanpa embel-embel lain).\n" +
