@@ -1692,6 +1692,7 @@ function extractUndanganWithGemini(textInput) {
                "ATURAN SUPER KETAT UNTUK INPUT UNDANGAN BARU (/i):\n" +
                "- Kamu HARUS mengekstrak 5 data wajib: (Pengirim, Nama Kegiatan, Tanggal, Jam, Lokasi).\n" +
                "- JIKA ada data yang kurang/tidak disebutkan di pesan asli, JANGAN berikan format /i! Balas dengan: ERROR: Pesan kamu kurang lengkap nih! Tolong sebutkan [sebutkan bagian yang kurang, misal: lokasi acaranya di mana dan jam berapa?] agar Monalissa bisa mencatatnya ke buku tamu 💅\n" +
+               "- JANGAN PERNAH meminta informasi Tahun! Sistem ini dirancang untuk kepengurusan tahun berjalan (2026/sekarang). Jika pesan tidak menyebutkan tahun, abaikan saja. JIKA pesan menyebutkan tanggal tanpa bulan (misal 'tanggal 6'), baru kamu boleh menanyakan bulannya.\n" +
                "- Kamu sangat cerdas, konversi teks waktu apa pun (misal '25 oktober', 'besok', 'jam setengah 3 sore') menjadi format Tanggal DD/MM (misal 25/10) dan Jam HH:MM (misal 14:30).\n" +
                "- Pastikan 'Nama Pengirim' ditulis HURUF BESAR SEMUA (contoh: UKKPK, BEM).\n" +
                "- Pastikan 'Nama Kegiatan' dan 'Lokasi' menggunakan Huruf Kapital di Awal Kata (Title Case). NAMUN untuk singkatan nama gedung/kampus (seperti MKU, PKM, LP2M, GOR, FIP, FEB, UNP) TETAPKAN SEBAGAI HURUF BESAR. Dan jika ada kata 'lantai', persingkat menjadi 'Lt.' agar rapi.\n\n" +
