@@ -20,7 +20,7 @@ function smartTitleCase(str) {
 }
 
 function doPost(e) {
-  if (!e || !e.postData || !e.postData.contents) return ContentService.createTextOutput("OK");
+  if (!e || !e.postData || !e.postData.contents) return;
   
   try {
     var update = JSON.parse(e.postData.contents);
@@ -29,8 +29,9 @@ function doPost(e) {
     console.error("Terjadi error saat memproses update: " + error.message);
   }
   
-  // WAJIB: Selalu kembalikan HTTP 200 OK agar Telegram tidak macet/queue stuck!
-  return ContentService.createTextOutput("OK");
+  // HAPUS return ContentService.createTextOutput("OK"); karena itu membuat GAS merespons 302 Redirect!
+  // Biarkan kosong (return undefined), GAS otomatis me-return 200 OK bersih.
+  return;
 }
 
 function processUpdate(update) {
