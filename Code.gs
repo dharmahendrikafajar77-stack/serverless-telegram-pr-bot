@@ -93,6 +93,52 @@ function doPost(e) {
     var mode = "mendatang"; 
     var targetBulan = -1;
 
+    if (inputInfo === "/info medpart") {
+      var sheetMp = SpreadsheetApp.openById(sheetId).getSheetByName("Medpart") || SpreadsheetApp.openById(sheetId).getSheetByName("Media Partner");
+      if (!sheetMp) return sendMessage(chatId, "❌ Sheet Medpart tidak ditemukan!");
+      
+      var dataMp = sheetMp.getDataRange().getValues();
+      var listMp = "";
+      var countMp = 0;
+      
+      for (var i = 2; i < dataMp.length; i++) {
+         var idMp = dataMp[i][1];
+         var instansi = dataMp[i][3];
+         var tglUpload = dataMp[i][5];
+         var bukti = dataMp[i][6] ? String(dataMp[i][6]).trim() : "";
+         var poster = dataMp[i][7] ? String(dataMp[i][7]).trim() : "";
+         
+         if (idMp && instansi) {
+            var statusSyarat = (bukti !== "" && bukti.toLowerCase() !== "menunggu syarat" && bukti.toLowerCase() !== "belum ada") ? "✅ Tersedia" : "❌ Menunggu Syarat";
+            var statusPoster = (poster !== "") ? "✅ Tersedia" : "❌ Belum Ada";
+            
+            listMp += "🔹 *" + idMp + "* (" + instansi + ")\n🗓️ Tgl Upload: " + tglUpload + "\n📌 Syarat: " + statusSyarat + "\n📌 Poster: " + statusPoster + "\n\n";
+            countMp++;
+         }
+      }
+      
+      if (countMp === 0) {
+         return sendMessage(chatId, "✨ *Belum Ada Media Partner* ✨\n\nWah, belum ada data Media Partner sama sekali di database kita!");
+      }
+      
+      var finalMp = "🤝 *STATUS MEDIA PARTNER TERKINI* 🤝\n\n" + listMp;
+      if (finalMp.length > 4000) {
+         var pesanArray = finalMp.split("\n\n");
+         var pesanKirim = "";
+         for (var p = 0; p < pesanArray.length; p++) {
+            if ((pesanKirim.length + pesanArray[p].length) > 4000) {
+               sendMessage(chatId, pesanKirim.trim());
+               pesanKirim = ""; 
+            }
+            pesanKirim += pesanArray[p] + "\n\n";
+         }
+         if (pesanKirim.trim() !== "") sendMessage(chatId, pesanKirim.trim());
+      } else {
+         sendMessage(chatId, finalMp.trim());
+      }
+      return;
+    }
+
     if (inputInfo === "/info semua") {
       mode = "semua";
     } else if (inputInfo.startsWith("/info bulan")) {
@@ -433,40 +479,53 @@ function doPost(e) {
      return;
   }
 
-  // FITUR EDIT UNDANGAN (/edit)
+  // FITUR EDIT UNDANGAN & MEDPART (/edit)
   if (text.startsWith("/edit ")) {
      var args = text.replace("/edit ", "").trim().split(" ");
      if (args.length < 3) {
-        return sendMessage(chatId, "❌ *Format salah!*\nGunakan: `/edit ID_Surat Kolom NilaiBaru`\nContoh: `/edit U23 Lokasi Gedung C`\nKolom tersedia: Pengirim, Kegiatan, Waktu, Lokasi");
+        return sendMessage(chatId, "❌ *Format salah!*\nGunakan: `/edit ID Kolom NilaiBaru`\nContoh: `/edit U23 Lokasi Gedung C` atau `/edit M01 Bukti link_gdrive`");
      }
      
-     var idSuratEdit = args[0].toUpperCase();
+     var idEdit = args[0].toUpperCase();
      var kolomEdit = args[1].toLowerCase();
      var nilaiBaru = args.slice(2).join(" ");
+     var isMedpart = idEdit.startsWith("M");
      
-     var sheet = SpreadsheetApp.openById(sheetId).getSheetByName("Undangan");
+     var sheet = isMedpart ? SpreadsheetApp.openById(sheetId).getSheetByName("Medpart") || SpreadsheetApp.openById(sheetId).getSheetByName("Media Partner") : SpreadsheetApp.openById(sheetId).getSheetByName("Undangan");
+     
+     if (!sheet) return sendMessage(chatId, "❌ Sheet " + (isMedpart ? "Medpart" : "Undangan") + " tidak ditemukan.");
+     
      var dataAll = sheet.getDataRange().getValues();
      var barisDitemukan = -1;
      
      for (var i = 0; i < dataAll.length; i++) {
-        if (dataAll[i][1] === idSuratEdit) { barisDitemukan = i + 1; break; }
+        if (dataAll[i][1] === idEdit) { barisDitemukan = i + 1; break; }
      }
      
      if (barisDitemukan !== -1) {
         var colIndex = -1;
-        if (kolomEdit === "pengirim") colIndex = 4;
-        else if (kolomEdit === "kegiatan") colIndex = 5;
-        else if (kolomEdit === "waktu") colIndex = 6;
-        else if (kolomEdit === "lokasi") colIndex = 7;
         
-        if (colIndex === -1) {
-           return sendMessage(chatId, "❌ Kolom *" + kolomEdit + "* tidak dikenali. Pilih antara: Pengirim, Kegiatan, Waktu, Lokasi");
+        if (!isMedpart) {
+            if (kolomEdit === "pengirim") colIndex = 4;
+            else if (kolomEdit === "kegiatan") colIndex = 5;
+            else if (kolomEdit === "waktu") colIndex = 6;
+            else if (kolomEdit === "lokasi") colIndex = 7;
+            
+            if (colIndex === -1) return sendMessage(chatId, "❌ Kolom *" + kolomEdit + "* tidak dikenali. Pilih: Pengirim, Kegiatan, Waktu, Lokasi");
+        } else {
+            if (kolomEdit === "instansi") colIndex = 4;
+            else if (kolomEdit === "cp") colIndex = 5;
+            else if (kolomEdit === "tanggal") colIndex = 6; // Tanggal Upload
+            else if (kolomEdit === "bukti") colIndex = 7;
+            
+            if (colIndex === -1) return sendMessage(chatId, "❌ Kolom *" + kolomEdit + "* tidak dikenali. Pilih: Instansi, Cp, Tanggal, Bukti");
         }
         
         sheet.getRange(barisDitemukan, colIndex).setValue(nilaiBaru);
-        sendMessage(chatId, "✅ Data surat *" + idSuratEdit + "* berhasil diubah!\n\n*Kolom:* " + kolomEdit + "\n*Nilai Baru:* " + nilaiBaru + " 💅");
+        var jenis = isMedpart ? "Media Partner" : "surat";
+        sendMessage(chatId, "✅ Data " + jenis + " *" + idEdit + "* berhasil diubah!\n\n*Kolom:* " + kolomEdit + "\n*Nilai Baru:* " + nilaiBaru + " 💅");
      } else {
-        sendMessage(chatId, "❌ ID Surat *" + idSuratEdit + "* tidak ditemukan.");
+        sendMessage(chatId, "❌ ID *" + idEdit + "* tidak ditemukan.");
      }
      return;
   }
@@ -658,7 +717,7 @@ function doPost(e) {
     // Urutan kolom: NO (1), ID Medpart (2), Tgl Masuk (3), Instansi (4), Cp (5), Tgl Upload (6), Bukti (7), Poster (8)
     sheetMp.appendRow([newIdNumber, newId, new Date(), instansiRapi, cpFinal, tglFixed, linkBuktiFinal, ""]); 
     
-    return sendMessage(chatId, "✅ *DATA MEDIA PARTNER DICATAT!* 💅\n\n*ID Medpart:* " + newId + "\n*Instansi:* " + instansiRapi + "\n*Tanggal Upload:* " + tglFixed + "\n\n_Catatan: Jika Poster Final sudah selesai direvisi oleh mereka, jangan lupa upload fotonya ke Monalissa dengan caption `/fmp " + newId + "` ya!_");
+    return sendMessage(chatId, "✅ *DATA MEDIA PARTNER DICATAT!* 💅\n\n*ID Medpart:* " + newId + "\n*Instansi:* " + instansiRapi + "\n*Tanggal Upload:* " + tglFixed + "\n\n_Catatan:_\n1. Jika Link GDrive Bukti Syarat (Follow & Like) sudah dikirim oleh mereka, setor ke AI dengan bilang: *'Ini link bukti syarat buat " + newId + " https://drive...'*.\n2. Jika nanti Poster Final sudah direvisi, baru upload fotonya dengan caption `/fmp " + newId + "` ya!");
   }
 
   // ==========================================
@@ -1610,10 +1669,11 @@ function extractUndanganWithGemini(textInput) {
                "2. Ambil Delegasi: /a ID_Surat Nama_Kamu\n" +
                "3. Batal Delegasi: /tarik ID_Surat Nama_Kamu\n" +
                "4. Hapus Surat: /hapus ID_Surat\n" +
-               "5. Edit Data: /edit ID_Surat Kolom NilaiBaru (Pilihan Kolom: Pengirim/Kegiatan/Waktu/Lokasi)\n" +
+               "5. Edit Data Undangan/Medpart: /edit ID Kolom NilaiBaru (Kolom Undangan: Pengirim/Kegiatan/Waktu/Lokasi | Kolom Medpart: Instansi/Cp/Tanggal/Bukti)\n" +
                "6. Upload Foto Bukti: /f ID_Surat\n" +
                "7. Input Media Partner: /mp\\nInstansi: NamaInstansi\\nCp: NamaAtauNomor\\nTanggal Upload: DD/MM\\nLink Bukti: LinkGDrive\n" +
-               "8. Upload Poster Media Partner: /fmp ID_Medpart\n\n" +
+               "8. Upload Poster Media Partner: /fmp ID_Medpart\n" +
+               "9. Cek Status Medpart: /info medpart\n\n" +
                "ATURAN SUPER KETAT UNTUK INPUT UNDANGAN BARU (/i):\n" +
                "- Kamu HARUS mengekstrak 5 data wajib: (Pengirim, Nama Kegiatan, Tanggal, Jam, Lokasi).\n" +
                "- JIKA ada data yang kurang/tidak disebutkan di pesan asli, JANGAN berikan format /i! Balas dengan: ERROR: Pesan kamu kurang lengkap nih! Tolong sebutkan [sebutkan bagian yang kurang, misal: lokasi acaranya di mana dan jam berapa?] agar Monalissa bisa mencatatnya ke buku tamu 💅\n" +
@@ -1622,12 +1682,14 @@ function extractUndanganWithGemini(textInput) {
                "- Pastikan 'Nama Kegiatan' dan 'Lokasi' menggunakan Huruf Kapital di Awal Kata (Title Case). NAMUN untuk singkatan nama gedung/kampus (seperti MKU, PKM, LP2M, GOR, FIP, FEB, UNP) TETAPKAN SEBAGAI HURUF BESAR. Dan jika ada kata 'lantai', persingkat menjadi 'Lt.' agar rapi.\n\n" +
                "ATURAN UMUM:\n" +
                "- Output HARUS HANYA format baku yang diawali dengan slash (/) jika pesan lengkap.\n" +
+               "- JIKA pesan meminta untuk mengecek status, rekap, daftar, atau menanyakan kabar media partner (medpart), gunakan format: /info medpart\n" +
+               "- JIKA pesan berisi kalimat mengirimkan/menyerahkan Link GDrive untuk Bukti Syarat Medpart yang sudah ada, gunakan format: /edit ID_Medpart Bukti LinkGdrive-nya\n" +
                "- Jika pesan berisi niat untuk mengunggah 'foto bukti kehadiran undangan', gunakan format /f ID_Surat (tanpa embel-embel lain).\n" +
                "- Jika pesan berisi niat untuk mengunggah 'foto poster media partner/medpart', gunakan format /fmp ID_Medpart.\n" +
                "- Jika pesan berisi informasi awal pendaftaran media partner baru, gunakan format /mp diikuti baris baru (Instansi: ..., Cp: ..., Tanggal Upload: ..., dan Link Bukti: ...). Jika ada yang belum ada, tulis 'Menunggu Syarat'.\n" +
                "- Jika pesan menyatakan ketersediaan hadir/ikut delegasi, gunakan format /a. Ekstrak nama orangnya jika ada, gunakan Huruf Kapital di Awal Kata.\n" +
                "- Jika pesan menyatakan batal/tidak jadi ikut, gunakan format /tarik.\n" +
-               "- Jika pesan meminta hapus undangan, gunakan format /hapus.\n\n" +
+               "- Jika pesan meminta hapus data, gunakan format /hapus.\n\n" +
                "Pesan masuk: \"" + textInput + "\"";
 
   var payload = {
