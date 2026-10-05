@@ -71,6 +71,7 @@ Berjalan otomatis menggunakan *Time-Driven Triggers* dari Google:
 - Menggunakan sistem **State Machine** berbantuan `CacheService` untuk mengingat percakapan.
 - Memungkinkan pengguna untuk menginput formulir secara bertahap (tanya jawab) tanpa harus hafal *slash commands*.
 - **Rencana ke Depan:** Menyatukan konsep *Interactive Wizard* ini ke dalam *Code.gs* utama untuk merombak fitur **Sponsorship & Partnership (SP/PT)**.
+- **Catatan Teknis (Tombol Clover 🍀):** Tombol menu interaktif ini tidak perlu dipanggil setiap saat dengan `/menu`. Nantinya, `ReplyKeyboardMarkup` ini akan ditempelkan satu kali pada balasan perintah `/start`. Setelah pengguna menekan `/start`, Telegram akan menyimpan logo *Clover* tersebut secara permanen di pojok kanan input *chat*, sehingga pengguna cukup mengklik logo tersebut kapan saja untuk memunculkan panel Menu.
 
 ---
 *Dokumen ini merupakan checkpoint pengembangan terkini. Selamat berpindah ke *device* yang baru, Jendral!* 🫡
