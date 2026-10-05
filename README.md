@@ -1,45 +1,76 @@
-# Serverless Telegram PR Bot (Monalissa)
+# 📓 Rangkuman Komprehensif Proyek: Monalissa PR Bot
+**Sistem Manajemen Divisi Public Relations (Serverless Telegram Bot)**
 
-A serverless Telegram Bot architecture built on Google Apps Script (GAS), utilizing Google Sheets as a real-time relational database. **Monalissa** automates Public Relations operations, handling CRUD tasks for event delegations, partnership management (Media Partners & Sponsorships), file uploads via Drive API, and automated cron-job reminders.
+Dokumen ini merangkum seluruh arsitektur, fitur, dan *progress* pengembangan bot Telegram "Monalissa" untuk mempermudah transisi pengerjaan Anda di perangkat baru.
 
-## Features
+## 🏗️ 1. Arsitektur Dasar & Infrastruktur
+- **Platform:** Google Apps Script (GAS) dengan pendekatan *Serverless*.
+- **Database:** Google Spreadsheet (melalui Sheet API bawaan GAS).
+- **Penyimpanan File:** Google Drive (untuk menyimpan foto bukti kegiatan dan poster).
+- **Komunikasi Telegram:** Menggunakan sistem Webhook (`doPost()`). 
+  - *Perbaikan Kritis:* Kita telah memperbaiki isu HTTP 302 dengan memastikan GAS me-*return* status `200 OK` (menggunakan `return;`) agar Telegram tidak nyangkut (*stuck* antrean).
+- **Konfigurasi (Script Properties):** Token Telegram, Sheet ID, Grup ID, Folder ID Drive, Gemini API Key, dan URL Webhook (baru saja ditambahkan) tidak lagi di-*hardcode*, melainkan diamankan di dalam `Script Properties`.
 
-- **Event Delegation (`/a`, `/i`, `/info`)**: Seamlessly input new events, assign delegations, and view upcoming events. Bot includes an intelligent inline keyboard system when searching for ambiguous names.
-- **Withdraw Delegation (`/tarik`)**: Delegates can withdraw their attendance from an event in case of schedule conflicts, automatically updating the attendance recap.
-- **Edit Records (`/edit`)**: Modify event details (Time, Location, Activity, Sender) directly from Telegram chat without touching the database sheet.
-- **Automated Evidence Collection (`/f`)**: Delegates can upload photo evidence which gets automatically formatted and displayed on Google Sheets using the Google Drive API.
-- **Interactive Cleanup for Inactive Delegations**: An automated cron job `hapusDelegasiTanpaBukti()` detects past events over 3 days old and notifies the PR Group. Admins can interactively approve (`[Hapus]`) or wave (`[Pertahankan]`) the evidence requirement via Inline Keyboards.
-- **Partnership Management (`/mp`, `/sp`, `/pt`)**: Easily record details for Media Partners, Sponsorships, and General Partnerships right from Telegram into your database.
-- **Data Deletion (`/hapus`)**: Fast and persistent row deletion right from the chat with automatic sequence numbering (NO column) adjustment.
+---
 
-## Prerequisites & Setup
+## ⚙️ 2. Daftar Modul Utama (Slash Commands)
 
-1. **Google Apps Script**: Create a new Google Apps Script project attached to your master Google Sheet.
-2. **File Structure**: Copy the contents of `Code.gs` into your Apps Script project.
-3. **Environment Variables**: Fill in the required global variables at the top of the script:
-   - `token`: Your Telegram Bot API Token from BotFather.
-   - `sheetId`: The ID of your Google Sheet.
-   - `grupChatId`: The Telegram Group Chat ID for broadcast notifications.
-   - `folderId`: The Google Drive folder ID to store uploaded photo evidence.
-   - `adminIds`: An array of Telegram User IDs for Admin privileges (used for auto-cleanup confirmation).
-4. **Deploy as Web App**:
-   - Deploy the script as a Web App (Execute as: "Me", Access: "Anyone").
-   - Register the resulting Web App URL to your Telegram Bot using the `setWebhook` API.
-5. **Set up Triggers**:
-   - Set up a time-driven trigger (cron) for `reminderDelegasi()` to run daily (e.g. morning).
-   - Set up a time-driven trigger for `hapusDelegasiTanpaBukti()` to run daily (e.g. midnight).
-   - Set up a time-driven trigger for `rekapBulanan()` to run on the 1st of every month.
+### A. Sistem & Keamanan
+- `/start` atau `hey`: Perkenalan bot.
+- `/tutor`: Memunculkan panduan fitur.
+- `/cekid`: Mengecek ID *Chat* / Grup (berguna saat instalasi awal).
+- `/daftar [Nama Lengkap]`: Pendaftaran user agar bot bisa mengirim *Direct Message* (DM/Japri) untuk *reminder* H-1.
+- `/broadcast`: Mengirim pesan masal ke seluruh user terdaftar.
 
-## Commands
+### B. Modul Undangan & Delegasi (Selesai 100%)
+- `/i [Pengirim, Kegiatan, Tanggal, Jam, Lokasi]`: Input undangan (dilengkapi Auto-ID `Uxx` & sistem Anti Duplikat).
+- `/a [ID] [Nama]`: Mengambil tugas delegasi.
+- `/tarik [ID] [Nama]`: Membatalkan keikutsertaan delegasi.
+- `/info`, `/info semua`, `/info bulan [bulan]`: Memantau jadwal undangan yang ada.
+- `/f [ID]`: *Upload* foto bukti kehadiran (menggunakan *Caption* gambar).
+- `/edit` & `/hapus`: CRUD (*Create, Read, Update, Delete*) data undangan.
+- *Fitur Cerdas:* Dilengkapi **Inline Keyboard** validasi nama panggilan. Jika dua orang punya panggilan yang sama, bot memberikan tombol pilihan.
 
-- `/start` or `/tutor`: Show help and command list.
-- `/i [Pengirim], [Kegiatan], [Tgl/Bln], [Jam Menit], [Lokasi]`: Input new invitation.
-- `/a [ID_Surat] [Nama]`: Claim a delegation slot.
-- `/tarik [ID_Surat] [Nama]`: Withdraw a delegation.
-- `/edit [ID_Surat] [Kolom] [Nilai_Baru]`: Edit event data (Kolom: Pengirim, Kegiatan, Waktu, Lokasi).
-- `/info [semua/bulan]`: View events database.
-- `/f [ID_Surat]`: Upload photo evidence (as caption).
-- `/hapus [ID_Surat]`: Permanently delete a record.
-- `/mp`, `/sp`, `/pt`: Manage partnerships with forms.
-- `/daftar [Nama Lengkap]`: Register account for direct messages.
-- `/broadcast [Pesan]`: Broadcast message to all registered members (Admin only).
+### C. Modul Media Partner / Medpart (Hampir Selesai)
+- `/mp`: Mendaftarkan klien (Auto-ID `Mxx`).
+- `/info medpart`: Cek kelengkapan syarat (Link Gdrive) & poster.
+- `/fmp [ID]`: *Upload* poster final ke Google Drive.
+- `/edit` & `/hapus`: CRUD khusus Media Partner.
+
+### D. Modul Sponsorship & Partnership (Prototipe Awal)
+- `/sp` dan `/pt`: Saat ini baru sebatas pendaftaran data mentah tanpa ID unik atau fungsi *tracking*. **Ini adalah target perombakan selanjutnya.**
+
+---
+
+## 🤖 3. Kecerdasan Buatan (Integrasi Gemini AI)
+- Menerjemahkan bahasa gaul / *natural language* menjadi perintah baku (*slash commands*).
+- **Pemicu:** `/ai [teks]` atau `/monalissa [teks]`.
+- **Posisi Pemrosesan:** Blok AI sudah dieksekusi di posisi **paling atas** pada `Code.gs` agar perintah yang diterjemahkan bisa langsung ditangkap oleh sistem.
+- **Aturan Ketat (Prompt):**
+  - Hanya akan membuat format `/i` jika kelima syarat terpenuhi (Pengirim, Kegiatan, Tanggal, Jam, Lokasi).
+  - Bisa memproses input waktu yang fleksibel ("besok", "jam 7 pagi").
+  - **Dilarang menanyakan Tahun** (Karena kepengurusan PR berganti secara *annual*/tahunan, dan Sheet akan di-reset setiap tahun).
+  - Bisa mendeteksi niat pengecekan `/info medpart`, `/info bulan september`, `/a`, `/tarik`, `/hapus`, dsb.
+
+---
+
+## ⏱️ 4. Trigger Otomatis (Pekerja Latar Belakang)
+Berjalan otomatis menggunakan *Time-Driven Triggers* dari Google:
+1. `reminderBelumAdaDelegasi()`: Menagih grup untuk mencari delegasi pada acara H-2 / H-1.
+2. `reminderDelegasi()`: Mengirim pengingat *Japri* (DM) ke anggota yang bertugas besok dan hari ini.
+3. `rekapBulanan()`: Mengirim *Leaderboard* keaktifan setiap tanggal 1.
+4. `hapusDelegasiTanpaBukti()`: Cek H+3 acara. Jika tidak ada bukti foto, bot melempar tombol ke Admin Grup untuk mengeksekusi Hapus atau Toleransi.
+5. `reminderMedpart()`: Cek kelipatan 3 hari. Menagih tim PR via tombol jika Syarat atau Poster masih kosong (lengkap dengan tombol Batal Medpart).
+6. `autoHealWebhook()`: *Watchdog* setiap 5-10 menit. Jika Telegram macet (*error 302* / banyak pending), fungsi ini otomatis memicu `resetWebhook()` agar bot sehat kembali.
+
+---
+
+## 🧪 5. Prototipe Masa Depan: Menu Interaktif (Wizard)
+- Berada di dalam sub-folder `Interactive/WizardMenu.js`.
+- Menggunakan konsep **ReplyKeyboardMarkup** (Tombol kustom menggantikan Keyboard Ponsel).
+- Menggunakan sistem **State Machine** berbantuan `CacheService` untuk mengingat percakapan.
+- Memungkinkan pengguna untuk menginput formulir secara bertahap (tanya jawab) tanpa harus hafal *slash commands*.
+- **Rencana ke Depan:** Menyatukan konsep *Interactive Wizard* ini ke dalam *Code.gs* utama untuk merombak fitur **Sponsorship & Partnership (SP/PT)**.
+
+---
+*Dokumen ini merupakan checkpoint pengembangan terkini. Selamat berpindah ke *device* yang baru, Jendral!* 🫡
