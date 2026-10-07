@@ -49,6 +49,8 @@ function processUpdate(update) {
   var chatId = msg.chat.id;
   var text = msg.text || msg.caption || ""; 
   var teksLower = text.toLowerCase().trim();
+  var userId = msg.from ? msg.from.id : null;
+  var isPrivateChat = (msg.chat.type === "private");
   
   // Normalisasi command jika dipanggil via menu pop-up di grup (contoh: /info@UKBAPR_Bot -> /info)
   if (text.startsWith("/")) {
@@ -60,6 +62,20 @@ function processUpdate(update) {
      }
   }
   
+  // ==========================================
+  // 🔐 GERBANG VERIFIKASI CHAT PRIBADI (DM)
+  // ==========================================
+  if (isPrivateChat && userId) {
+    var isExemptCmd = (teksLower === "/start" || teksLower === "hey" || text.startsWith("/daftar ") || text === "/cekid");
+    if (!isExemptCmd) {
+      var verifikasi = verifikasiMember(userId);
+      if (!verifikasi.verified) {
+        sendMessage(chatId, verifikasi.msg);
+        return;
+      }
+    }
+  }
+
   // ==========================================
   // 🤖 FITUR BARU: AI PENGENALAN UNDANGAN & PERINTAH
   // ==========================================
@@ -98,21 +114,39 @@ function processUpdate(update) {
     if (wizardHandled) return;
   }
 
- // 1. KOTAK PANDUAN (/start & /tutor)
-  if (teksLower === "/start" || teksLower === "hey" || text === "📝 Input Undangan Baru" || text === "🤝 Input Medpart" || text === "📊 Cek Jadwal" || text === "📊 Cek Info" || text === "👥 Daftar Delegasi") {
-    // Kirim pesan sambutan + pasang menu Clover 🍀
-    var cloverKeyboard = {
-      "keyboard": [
-        [{"text": "📝 Input Undangan Baru"}, {"text": "🤝 Input Medpart"}],
-        [{"text": "📊 Cek Info"}, {"text": "👥 Daftar Delegasi"}]
-      ],
-      "resize_keyboard": true,
-      "one_time_keyboard": false
-    };
-    sendMessage(chatId, "Halo Tim PR! Kenalin, aku *Monalissa* 💅, asisten digital 24 jam kebanggaan divisi PR UKBA.\n\nKetik `/tutor` kalau kamu butuh panduan, atau `/info` untuk lihat daftar undangan ter-update!\n\n🍀 _Kamu juga bisa pakai tombol akses cepat (clover) di bawah kapan saja!_", cloverKeyboard);
+  // 1. KOTAK PANDUAN (/start & /tutor) & GATEWAY DM
+  if (teksLower === "/start" || teksLower === "hey" || text === "🏢 Pekerjaan" || text === "📊 Informasi" || text === "🛠️ Admin") {
     
-    kirimMenuUtama(chatId, "Pilih opsi di bawah untuk navigasi interaktif:");
-    return; 
+    if (isPrivateChat) {
+       var cekGrup = cekMemberGrup(userId);
+       if (!cekGrup.isMember) {
+          return sendMessage(chatId, "❌ Maaf, kamu tidak terdeteksi sebagai anggota Grup PR UKBA. Akses ditolak! 💅");
+       }
+       
+       var dataUserVerif = verifikasiMember(userId);
+       if (!dataUserVerif.verified) {
+          return sendMessage(chatId, "👋 Halo! Kamu sudah terdeteksi sebagai anggota Grup PR, tapi Monalissa belum tahu namamu.\n\nSilakan daftarkan dirimu dengan mengetik:\n`/daftar Nama Lengkap Kamu`\n_(Pastikan sesuai dengan SK Pengurus)_ 💅");
+       }
+       
+       var menuUtamaKbd = [
+          [{"text": "🏢 Pekerjaan"}, {"text": "📊 Informasi"}]
+       ];
+       if (dataUserVerif.isAdmin) {
+          menuUtamaKbd.push([{"text": "🛠️ Admin"}]);
+       }
+       
+       var cloverKeyboard = {
+         "keyboard": menuUtamaKbd,
+         "resize_keyboard": true,
+         "one_time_keyboard": false
+       };
+       sendMessage(chatId, "Halo *" + dataUserVerif.nama + "*! Kenalin, aku *Monalissa* 💅, asisten digital 24 jam kebanggaan divisi PR UKBA.\n\nKetik `/tutor` kalau kamu butuh panduan, atau navigasi langsung lewat menu di bawah ini!\n\n🍀 _Kamu juga bisa pakai tombol akses cepat (clover) kapan saja!_", cloverKeyboard);
+       kirimMenuUtama(chatId, "Selamat datang di *Menu Interaktif Monalissa*! 💅\nSilakan pilih menu utama di bawah ini:", dataUserVerif.isAdmin);
+       return; 
+    } else {
+       // Di Grup, tidak merespon start
+       return;
+    }
   }
 
   if (text === "/cekid") {
@@ -439,7 +473,7 @@ function processUpdate(update) {
     sheet.appendRow([nomorUrutKolomA, idSurat, waktuDiterima, data[0], data[1], waktuSheet, data[4], "", ""]);
     
     var balasan = "🚨 *UNDANGAN BARU MASUK!* 🚨\n\n*ID Surat:* " + idSurat + "\n*UK Pengirim:* " + data[0] + "\n*Kegiatan:* " + data[1] + "\n*Waktu:* " + waktuTampil + "\n*Lokasi:* " + data[4] + "\n\n👥 _Siapa yang bersedia? Balas pesan ini:_ \n`/a " + idSurat + " Nama_Kamu`";
-    sendMessage(chatId, balasan);
+    kirimBalasanGanda(chatId, balasan);
     return;
   }
 
@@ -518,7 +552,7 @@ function processUpdate(update) {
         }
         
         var jenis = isMedpart ? "Media Partner" : "Undangan";
-        sendMessage(chatId, "✅ Data " + jenis + " *" + idHapus + "* berhasil dihapus secara permanen dan penomoran (NO) telah dirapikan kembali. 💅");
+        kirimBalasanGanda(chatId, "✅ Data " + jenis + " *" + idHapus + "* berhasil dihapus secara permanen dan penomoran (NO) telah dirapikan kembali. 💅");
      } else {
         sendMessage(chatId, "❌ ID *" + idHapus + "* tidak ditemukan di database " + (isMedpart ? "Medpart" : "Undangan") + ".");
      }
@@ -569,7 +603,7 @@ function processUpdate(update) {
         
         sheet.getRange(barisDitemukan, colIndex).setValue(nilaiBaru);
         var jenis = isMedpart ? "Media Partner" : "surat";
-        sendMessage(chatId, "✅ Data " + jenis + " *" + idEdit + "* berhasil diubah!\n\n*Kolom:* " + kolomEdit + "\n*Nilai Baru:* " + nilaiBaru + " 💅");
+        kirimBalasanGanda(chatId, "✅ Data " + jenis + " *" + idEdit + "* berhasil diubah!\n\n*Kolom:* " + kolomEdit + "\n*Nilai Baru:* " + nilaiBaru + " 💅");
      } else {
         sendMessage(chatId, "❌ ID *" + idEdit + "* tidak ditemukan.");
      }
@@ -625,7 +659,7 @@ function processUpdate(update) {
         var delegasiBaru = newDelegasiArr.join(", ");
         
         selDelegasi.setValue(delegasiBaru);
-        sendMessage(chatId, "✅ Delegasi *" + namaBaku + "* berhasil ditarik dari undangan *" + idSuratTarik + "*. 💅\n\n*Sisa Delegasi:* " + (delegasiBaru === "" ? "_(Kosong)_" : delegasiBaru));
+        kirimBalasanGanda(chatId, "✅ Delegasi *" + namaBaku + "* berhasil ditarik dari undangan *" + idSuratTarik + "*. 💅\n\n*Sisa Delegasi:* " + (delegasiBaru === "" ? "_(Kosong)_" : delegasiBaru));
      } else {
         sendMessage(chatId, "❌ ID Surat *" + idSuratTarik + "* tidak ditemukan.");
      }
@@ -665,7 +699,7 @@ function processUpdate(update) {
     
     if(barisDitemukan !== -1) {
       sheet.getRange(barisDitemukan, 9).setFormula('=IMAGE("' + directImageUrl + '")');
-      sendMessage(chatId, "📸 *Bukti Kehadiran Berhasil Diupload!*\n\nTerima kasih atas laporannya. Fotonya sudah dipajang cantik oleh Monalissa di database PR! 💅");
+      kirimBalasanGanda(chatId, "📸 *Bukti Kehadiran Berhasil Diupload!*\n\nTerima kasih atas laporannya. Fotonya sudah dipajang cantik oleh Monalissa di database PR! 💅\n_Surat ID: " + idSuratFoto + "_");
     } else {
       sendMessage(chatId, "❌ Foto gagal diproses: ID Surat *" + idSuratFoto + "* tidak ditemukan di database.");
     }
@@ -706,7 +740,7 @@ function processUpdate(update) {
     if(barisDitemukan !== -1) {
       // Kolom ke-8 adalah Poster
       sheetMp.getRange(barisDitemukan, 8).setFormula('=IMAGE("' + directImageUrl + '")');
-      sendMessage(chatId, "📸 *Poster Media Partner Berhasil Disimpan!*\n\nKerja bagus! Poster final untuk " + idMpFoto + " sudah diamankan oleh Monalissa.\n\n_Pastikan kamu segera meneruskan (forward) pesan berisi poster ini ke Divisi Design and Media ya!_ 💅");
+      kirimBalasanGanda(chatId, "📸 *Poster Media Partner Berhasil Disimpan!*\n\nKerja bagus! Poster final untuk " + idMpFoto + " sudah diamankan oleh Monalissa.\n\n_Pastikan kamu segera meneruskan (forward) pesan berisi poster ini ke Divisi Design and Media ya!_ 💅");
     } else {
       sendMessage(chatId, "❌ Foto gagal diproses: ID Medpart *" + idMpFoto + "* tidak ditemukan di database.");
     }
@@ -763,7 +797,8 @@ function processUpdate(update) {
     // Urutan kolom: NO (1), ID Medpart (2), Tgl Masuk (3), Instansi (4), Cp (5), Tgl Upload (6), Bukti (7), Poster (8)
     sheetMp.appendRow([newIdNumber, newId, new Date(), instansiRapi, cpFinal, tglFixed, linkBuktiFinal, ""]); 
     
-    return sendMessage(chatId, "✅ *DATA MEDIA PARTNER DICATAT!* 💅\n\n*ID Medpart:* " + newId + "\n*Instansi:* " + instansiRapi + "\n*Tanggal Upload:* " + tglFixed + "\n\n_Catatan:_\n1. Jika Link GDrive Bukti Syarat (Follow & Like) sudah dikirim oleh mereka, setor ke AI dengan bilang: *'Ini link bukti syarat buat " + newId + " https://drive...'*.\n2. Jika nanti Poster Final sudah direvisi, baru upload fotonya dengan caption `/fmp " + newId + "` ya!");
+    kirimBalasanGanda(chatId, "✅ *DATA MEDIA PARTNER DICATAT!* 💅\n\n*ID Medpart:* " + newId + "\n*Instansi:* " + instansiRapi + "\n*Tanggal Upload:* " + tglFixed + "\n\n_Catatan:_\n1. Jika Link GDrive Bukti Syarat (Follow & Like) sudah dikirim oleh mereka, setor ke AI dengan bilang: *'Ini link bukti syarat buat " + newId + " https://drive...'*.\n2. Jika nanti Poster Final sudah direvisi, baru upload fotonya dengan caption `/fmp " + newId + "` ya!");
+    return;
   }
 
   // ==========================================
@@ -789,7 +824,8 @@ function processUpdate(update) {
 
     // Urutan: NO, Instansi, Tanggal, Persyaratan, Benefit
     sheetSp.appendRow([nomorUrut, instansi.trim(), tglFixed, syarat.trim(), benefit.trim()]);
-    return sendMessage(chatId, "💰 *DATA SPONSORSHIP DICATAT!* 💰\n\nInstansi: " + instansi.trim() + "\nBenefit:\n" + benefit.trim());
+    kirimBalasanGanda(chatId, "💰 *DATA SPONSORSHIP DICATAT!* 💰\n\nInstansi: " + instansi.trim() + "\nBenefit:\n" + benefit.trim());
+    return;
   }
 
   // ==========================================
@@ -814,7 +850,8 @@ function processUpdate(update) {
     // Urutan Sheet: NO, Instansi, Persyaratan, Benefit, Mulai, Selesai
     sheetPt.appendRow([nomorUrut, instansi.trim(), syarat.trim(), benefit.trim(), mulai.trim(), selesai.trim()]);
     
-    return sendMessage(chatId, "🤝 *DATA PARTNERSHIP DICATAT!* 🤝\n\nInstansi: " + instansi.trim() + "\nBenefit:\n" + benefit.trim() + "\n\nDurasi: " + mulai.trim() + " s/d " + selesai.trim());
+    kirimBalasanGanda(chatId, "🤝 *DATA PARTNERSHIP DICATAT!* 🤝\n\nInstansi: " + instansi.trim() + "\nBenefit:\n" + benefit.trim() + "\n\nDurasi: " + mulai.trim() + " s/d " + selesai.trim());
+    return;
   }
   
 }
@@ -846,6 +883,63 @@ function cariNamaLengkapDatabase(inputRaw) {
   if (matches.length === 1) return { status: true, nama: matches[0] };
   if (matches.length > 1) return { status: "multiple", matches: matches };
   return { status: false, msg: "❌ Nama '" + inputRaw + "' tidak terdaftar di database anggota." };
+}
+
+function verifikasiMember(userId) {
+  var cache = CacheService.getScriptCache();
+  var cachedResult = cache.get("VERIFIED_" + userId);
+  
+  if (cachedResult) {
+    try { return JSON.parse(cachedResult); } catch(e) {}
+  }
+  
+  // Cek 1: Apakah user terdaftar di User_Bot?
+  var sheetUser = SpreadsheetApp.openById(sheetId).getSheetByName("User_Bot");
+  if (!sheetUser) return { verified: false, msg: "❌ Database User_Bot tidak ditemukan. Hubungi Admin.", isAdmin: false };
+  
+  var dataUser = sheetUser.getDataRange().getValues();
+  var namaUser = "";
+  var found = false;
+  
+  for (var i = 1; i < dataUser.length; i++) {
+    if (String(dataUser[i][0]) === String(userId)) {
+      found = true;
+      namaUser = dataUser[i][1] || "";
+      break;
+    }
+  }
+  
+  if (!found) {
+    return { verified: false, msg: "❌ Kamu belum terdaftar di sistem Monalissa.\n\nKetik `/daftar NamaLengkap` untuk mendaftar.\n_(Nama harus sesuai database pengurus)_", isAdmin: false };
+  }
+  
+  // Cek 2: Apakah user masih member Grup PR?
+  var cekGrup = cekMemberGrup(userId);
+  if (!cekGrup.isMember) {
+    return { verified: false, msg: "❌ Kamu bukan anggota Grup PR UKBA. Hubungi Admin untuk bergabung.", isAdmin: false };
+  }
+  
+  var result = { verified: true, nama: namaUser, isAdmin: cekGrup.isAdmin };
+  cache.put("VERIFIED_" + userId, JSON.stringify(result), 21600);
+  return result;
+}
+
+function cekMemberGrup(userId) {
+  if (!grupChatId) return { isMember: false, isAdmin: false };
+  
+  var checkUrl = "https://api.telegram.org/bot" + token + "/getChatMember?chat_id=" + grupChatId + "&user_id=" + userId;
+  var checkResponse = UrlFetchApp.fetch(checkUrl, {muteHttpExceptions: true});
+  var checkData = JSON.parse(checkResponse.getContentText());
+  
+  if (!checkData.ok) return { isMember: false, isAdmin: false };
+  
+  var status = checkData.result.status;
+  if (status === "left" || status === "kicked") {
+    return { isMember: false, isAdmin: false };
+  }
+  
+  var isAdmin = (status === "administrator" || status === "creator");
+  return { isMember: true, isAdmin: isAdmin };
 }
 
 function updateRekapDelegasi(namaBaku) {
@@ -894,6 +988,13 @@ function updateRekapDelegasi(namaBaku) {
 // ==========================================
 // FUNGSI HELPER & TRIGGERS LAMA
 // ==========================================
+
+function kirimBalasanGanda(chatId, text) {
+  sendMessage(chatId, text);
+  if (grupChatId && String(chatId) !== String(grupChatId)) {
+    sendMessage(grupChatId, text);
+  }
+}
 
 function sendMessage(chatId, text, replyMarkup) {
   var url = "https://api.telegram.org/bot" + token + "/sendMessage";
@@ -1148,6 +1249,12 @@ function handleCallback(callbackQuery) {
   var parts = cbData.split("|");
   var action = parts[0];
   
+  if (action.startsWith("NAV_") || action === "MENU_KEMBALI" || action === "ACTION_INFO") {
+     var cache = CacheService.getScriptCache();
+     cache.remove("WIZ_STATE_" + userIdCallback);
+     clearWizardMessages(chatId, userIdCallback, messageId);
+  }
+  
   if (action === "DEL_YES" || action === "DEL_NO") {
      // Validasi Admin secara otomatis dari Grup Telegram
      var checkUrl = "https://api.telegram.org/bot" + token + "/getChatMember?chat_id=" + grupChatId + "&user_id=" + userIdCallback;
@@ -1268,7 +1375,7 @@ function handleCallback(callbackQuery) {
 
   if (action === "MENU_INPUT_UNDANGAN") {
     var textBaru = "Siyapp! Mari kita buat undangan baru. ✍️\n\nSiapa *Nama Pengirim* undangannya?\n_(Contoh: BEM, UKKPK, LP2M)_";
-    var keyboard = { "inline_keyboard": [[{"text": "🔙 Kembali", "callback_data": "MENU_KEMBALI"}]] };
+    var keyboard = { "inline_keyboard": [[{"text": "🔙 Batal", "callback_data": "NAV_PEKERJAAN_UNDANGAN"}]] };
     UrlFetchApp.fetch("https://api.telegram.org/bot" + token + "/editMessageText", { method: "post", contentType: "application/json", payload: JSON.stringify({ chat_id: String(chatId), message_id: messageId, text: textBaru, parse_mode: "Markdown", reply_markup: keyboard }), muteHttpExceptions: true });
     
     var cache = CacheService.getScriptCache();
@@ -1279,7 +1386,7 @@ function handleCallback(callbackQuery) {
 
   if (action === "MENU_INPUT_MEDPART") {
     var textBaru = "Siyapp! Mari kita input Medpart. ✍️\n\nApa *Nama Instansi/Organisasi* pengaju Medpart?";
-    var keyboard = { "inline_keyboard": [[{"text": "🔙 Kembali", "callback_data": "MENU_KEMBALI"}]] };
+    var keyboard = { "inline_keyboard": [[{"text": "🔙 Batal", "callback_data": "NAV_PEKERJAAN_MEDPART"}]] };
     UrlFetchApp.fetch("https://api.telegram.org/bot" + token + "/editMessageText", { method: "post", contentType: "application/json", payload: JSON.stringify({ chat_id: String(chatId), message_id: messageId, text: textBaru, parse_mode: "Markdown", reply_markup: keyboard }), muteHttpExceptions: true });
     
     var cache = CacheService.getScriptCache();
@@ -1289,25 +1396,13 @@ function handleCallback(callbackQuery) {
   }
 
   if (action === "MENU_CEK_JADWAL") {
-    var textBaru = "📊 *MENU INFORMASI & JADWAL*\nSilakan pilih informasi apa yang ingin kamu lihat:";
-    var keyboard = { "inline_keyboard": [
-        [{"text": "📅 Undangan Mendatang", "callback_data": "ACTION_INFO|mendatang"}],
-        [{"text": "📆 Undangan Bulanan", "callback_data": "MENU_PILIH_BULAN"}],
-        [{"text": "🤝 Info Media Partner", "callback_data": "ACTION_INFO|medpart"}],
-        [{"text": "🔙 Kembali", "callback_data": "MENU_KEMBALI"}]
-    ] };
-    UrlFetchApp.fetch("https://api.telegram.org/bot" + token + "/editMessageText", { method: "post", contentType: "application/json", payload: JSON.stringify({ chat_id: String(chatId), message_id: messageId, text: textBaru, parse_mode: "Markdown", reply_markup: keyboard }), muteHttpExceptions: true });
-    return UrlFetchApp.fetch("https://api.telegram.org/bot" + token + "/answerCallbackQuery?callback_query_id=" + callbackQuery.id);
-  }
-
-  if (action === "MENU_PILIH_BULAN") {
     var textBaru = "📆 *PILIH BULAN REKAP*\nSilakan pilih bulan untuk melihat rekap undangan:";
     var keyboard = { "inline_keyboard": [
         [{"text": "Jan", "callback_data": "ACTION_INFO|bulan|januari"}, {"text": "Feb", "callback_data": "ACTION_INFO|bulan|februari"}, {"text": "Mar", "callback_data": "ACTION_INFO|bulan|maret"}],
         [{"text": "Apr", "callback_data": "ACTION_INFO|bulan|april"}, {"text": "Mei", "callback_data": "ACTION_INFO|bulan|mei"}, {"text": "Jun", "callback_data": "ACTION_INFO|bulan|juni"}],
         [{"text": "Jul", "callback_data": "ACTION_INFO|bulan|juli"}, {"text": "Agu", "callback_data": "ACTION_INFO|bulan|agustus"}, {"text": "Sep", "callback_data": "ACTION_INFO|bulan|september"}],
         [{"text": "Okt", "callback_data": "ACTION_INFO|bulan|oktober"}, {"text": "Nov", "callback_data": "ACTION_INFO|bulan|november"}, {"text": "Des", "callback_data": "ACTION_INFO|bulan|desember"}],
-        [{"text": "🔙 Kembali", "callback_data": "MENU_CEK_JADWAL"}]
+        [{"text": "🔙 Kembali", "callback_data": "NAV_INFO_UNDANGAN"}]
     ] };
     UrlFetchApp.fetch("https://api.telegram.org/bot" + token + "/editMessageText", { method: "post", contentType: "application/json", payload: JSON.stringify({ chat_id: String(chatId), message_id: messageId, text: textBaru, parse_mode: "Markdown", reply_markup: keyboard }), muteHttpExceptions: true });
     return UrlFetchApp.fetch("https://api.telegram.org/bot" + token + "/answerCallbackQuery?callback_query_id=" + callbackQuery.id);
@@ -1406,7 +1501,7 @@ function handleCallback(callbackQuery) {
     var textBaru = "📋 *PILIH UNDANGAN MENDATANG*\nSilakan klik undangan yang ingin kamu hadiri:";
     if (buttons.length === 0) textBaru = "✨ Wah, tidak ada undangan kosong di masa depan!";
     
-    buttons.push([{"text": "🔙 Kembali", "callback_data": "MENU_KEMBALI"}]);
+    buttons.push([{"text": "🔙 Batal", "callback_data": "NAV_PEKERJAAN_UNDANGAN"}]);
     var keyboard = { "inline_keyboard": buttons };
     
     UrlFetchApp.fetch("https://api.telegram.org/bot" + token + "/editMessageText", { method: "post", contentType: "application/json", payload: JSON.stringify({ chat_id: String(chatId), message_id: messageId, text: textBaru, parse_mode: "Markdown", reply_markup: keyboard }), muteHttpExceptions: true });
@@ -1425,7 +1520,7 @@ function handleCallback(callbackQuery) {
        }
     }
     var textBaru = "✨ Kamu memilih: *" + detail + "*\n\n📝 *Mendaftarkan delegasi...*\nSilakan ketikkan *Nama Lengkap* kamu di chat ini:";
-    var keyboard = { "inline_keyboard": [[{"text": "🔙 Kembali", "callback_data": "MENU_KEMBALI"}]] };
+    var keyboard = { "inline_keyboard": [[{"text": "🔙 Batal", "callback_data": "NAV_PEKERJAAN_UNDANGAN"}]] };
     UrlFetchApp.fetch("https://api.telegram.org/bot" + token + "/editMessageText", { method: "post", contentType: "application/json", payload: JSON.stringify({ chat_id: String(chatId), message_id: messageId, text: textBaru, parse_mode: "Markdown", reply_markup: keyboard }), muteHttpExceptions: true });
     
     var cache = CacheService.getScriptCache();
@@ -1436,18 +1531,193 @@ function handleCallback(callbackQuery) {
   }
 
   if (action === "MENU_KEMBALI") {
-    var cache = CacheService.getScriptCache();
-    cache.remove("WIZ_STATE_" + userIdCallback);
-    clearWizardMessages(chatId, userIdCallback, messageId);
+    var isAdmin = cekMemberGrup(userIdCallback).isAdmin;
+    var textBaru = "Selamat datang di *Menu Interaktif Monalissa*! 💅\nSilakan pilih menu utama di bawah ini:";
+    var inlineKbd = [
+        [{"text": "🏢 Pekerjaan", "callback_data": "NAV_PEKERJAAN"}, {"text": "📊 Informasi", "callback_data": "NAV_INFORMASI"}]
+    ];
+    if (isAdmin) {
+        inlineKbd.push([{"text": "🛠️ Admin", "callback_data": "NAV_ADMIN"}]);
+    }
     
-    var textBaru = "Selamat datang di *Menu Interaktif Monalissa*! 💅\nSilakan pilih menu di bawah ini:";
-    var keyboard = {
-      "inline_keyboard": [
-        [{"text": "📝 Input Undangan Baru", "callback_data": "MENU_INPUT_UNDANGAN"}, {"text": "🤝 Input Medpart", "callback_data": "MENU_INPUT_MEDPART"}],
-        [{"text": "📊 Cek Jadwal", "callback_data": "MENU_CEK_JADWAL"}, {"text": "👥 Daftar Delegasi", "callback_data": "MENU_DAFTAR_DELEGASI"}]
-      ]
-    };
+    var keyboard = { "inline_keyboard": inlineKbd };
     UrlFetchApp.fetch("https://api.telegram.org/bot" + token + "/editMessageText", { method: "post", contentType: "application/json", payload: JSON.stringify({ chat_id: String(chatId), message_id: messageId, text: textBaru, parse_mode: "Markdown", reply_markup: keyboard }), muteHttpExceptions: true });
+    return UrlFetchApp.fetch("https://api.telegram.org/bot" + token + "/answerCallbackQuery?callback_query_id=" + callbackQuery.id);
+  }
+
+  // --- NAVIGASI LEVEL 1 ---
+  if (action === "NAV_PEKERJAAN") {
+     var textBaru = "🏢 *MODUL PEKERJAAN*\nSilakan pilih modul yang ingin dikerjakan:";
+     var keyboard = { inline_keyboard: [
+         [{"text": "📩 Undangan", "callback_data": "NAV_PEKERJAAN_UNDANGAN"}, {"text": "🤝 Media Partner", "callback_data": "NAV_PEKERJAAN_MEDPART"}],
+         [{"text": "💰 Sponsorship", "callback_data": "NAV_PEKERJAAN_SPONSOR"}, {"text": "🔗 Partnership", "callback_data": "NAV_PEKERJAAN_PARTNER"}],
+         [{"text": "🔙 Menu Utama", "callback_data": "MENU_KEMBALI"}]
+     ]};
+     UrlFetchApp.fetch("https://api.telegram.org/bot" + token + "/editMessageText", { method: "post", contentType: "application/json", payload: JSON.stringify({ chat_id: String(chatId), message_id: messageId, text: textBaru, parse_mode: "Markdown", reply_markup: keyboard }), muteHttpExceptions: true });
+     return UrlFetchApp.fetch("https://api.telegram.org/bot" + token + "/answerCallbackQuery?callback_query_id=" + callbackQuery.id);
+  }
+
+  if (action === "NAV_INFORMASI") {
+     var textBaru = "📊 *PUSAT INFORMASI*\nSilakan pilih modul informasi yang ingin dilihat:";
+     var keyboard = { inline_keyboard: [
+         [{"text": "📩 Undangan", "callback_data": "NAV_INFO_UNDANGAN"}],
+         [{"text": "🤝 Media Partner", "callback_data": "NAV_INFO_MEDPART"}],
+         [{"text": "💰 Sponsorship", "callback_data": "NAV_INFO_SPONSOR"}],
+         [{"text": "🔗 Partnership", "callback_data": "NAV_INFO_PARTNER"}],
+         [{"text": "🔙 Menu Utama", "callback_data": "MENU_KEMBALI"}]
+     ]};
+     UrlFetchApp.fetch("https://api.telegram.org/bot" + token + "/editMessageText", { method: "post", contentType: "application/json", payload: JSON.stringify({ chat_id: String(chatId), message_id: messageId, text: textBaru, parse_mode: "Markdown", reply_markup: keyboard }), muteHttpExceptions: true });
+     return UrlFetchApp.fetch("https://api.telegram.org/bot" + token + "/answerCallbackQuery?callback_query_id=" + callbackQuery.id);
+  }
+
+  if (action === "NAV_ADMIN") {
+     var textBaru = "🛠️ *PANEL ADMIN*\nSilakan pilih menu khusus Admin:";
+     var keyboard = { inline_keyboard: [
+         [{"text": "🗑️ Hapus Data", "callback_data": "MENU_ADMIN_HAPUS"}, {"text": "📢 Broadcast", "callback_data": "MENU_ADMIN_BROADCAST"}],
+         [{"text": "🔙 Menu Utama", "callback_data": "MENU_KEMBALI"}]
+     ]};
+     UrlFetchApp.fetch("https://api.telegram.org/bot" + token + "/editMessageText", { method: "post", contentType: "application/json", payload: JSON.stringify({ chat_id: String(chatId), message_id: messageId, text: textBaru, parse_mode: "Markdown", reply_markup: keyboard }), muteHttpExceptions: true });
+     return UrlFetchApp.fetch("https://api.telegram.org/bot" + token + "/answerCallbackQuery?callback_query_id=" + callbackQuery.id);
+  }
+
+  // --- NAVIGASI LEVEL 2 (PEKERJAAN) ---
+  if (action === "NAV_PEKERJAAN_UNDANGAN") {
+     var textBaru = "📩 *MODUL UNDANGAN*\nSilakan pilih fitur yang ingin digunakan:";
+     var keyboard = { inline_keyboard: [
+         [{"text": "📝 Input Undangan Baru", "callback_data": "MENU_INPUT_UNDANGAN"}],
+         [{"text": "👥 Ambil Delegasi", "callback_data": "MENU_DAFTAR_DELEGASI"}],
+         [{"text": "📸 Unggah Bukti Kehadiran", "callback_data": "MENU_UPLOAD_FOTO_UNDANGAN"}],
+         [{"text": "⚙️ Edit Undangan", "callback_data": "MENU_EDIT_UNDANGAN"}],
+         [{"text": "🔙 Kembali", "callback_data": "NAV_PEKERJAAN"}]
+     ]};
+     UrlFetchApp.fetch("https://api.telegram.org/bot" + token + "/editMessageText", { method: "post", contentType: "application/json", payload: JSON.stringify({ chat_id: String(chatId), message_id: messageId, text: textBaru, parse_mode: "Markdown", reply_markup: keyboard }), muteHttpExceptions: true });
+     return UrlFetchApp.fetch("https://api.telegram.org/bot" + token + "/answerCallbackQuery?callback_query_id=" + callbackQuery.id);
+  }
+
+  if (action === "NAV_PEKERJAAN_MEDPART") {
+     var textBaru = "🤝 *MODUL MEDIA PARTNER*\nSilakan pilih fitur yang ingin digunakan:";
+     var keyboard = { inline_keyboard: [
+         [{"text": "📝 Input Medpart Baru", "callback_data": "MENU_INPUT_MEDPART"}],
+         [{"text": "⚙️ Update Mediapartner", "callback_data": "MENU_UPDATE_MEDPART_LIST"}],
+         [{"text": "🔙 Kembali", "callback_data": "NAV_PEKERJAAN"}]
+     ]};
+     UrlFetchApp.fetch("https://api.telegram.org/bot" + token + "/editMessageText", { method: "post", contentType: "application/json", payload: JSON.stringify({ chat_id: String(chatId), message_id: messageId, text: textBaru, parse_mode: "Markdown", reply_markup: keyboard }), muteHttpExceptions: true });
+     return UrlFetchApp.fetch("https://api.telegram.org/bot" + token + "/answerCallbackQuery?callback_query_id=" + callbackQuery.id);
+  }
+
+  if (action === "NAV_PEKERJAAN_SPONSOR") {
+     var textBaru = "💰 *MODUL SPONSORSHIP*\n\nUntuk mencatat data Sponsorship, silakan kirimkan pesan baru ke Monalissa dengan format formulir berikut:\n\n`/sp`\n`Instansi: `\n`Tanggal: `\n`Persyaratan: `\n`Benefit: `";
+     var keyboard = { inline_keyboard: [[{"text": "🔙 Kembali", "callback_data": "NAV_PEKERJAAN"}]]};
+     UrlFetchApp.fetch("https://api.telegram.org/bot" + token + "/editMessageText", { method: "post", contentType: "application/json", payload: JSON.stringify({ chat_id: String(chatId), message_id: messageId, text: textBaru, parse_mode: "Markdown", reply_markup: keyboard }), muteHttpExceptions: true });
+     return UrlFetchApp.fetch("https://api.telegram.org/bot" + token + "/answerCallbackQuery?callback_query_id=" + callbackQuery.id);
+  }
+
+  if (action === "NAV_PEKERJAAN_PARTNER") {
+     var textBaru = "🔗 *MODUL PARTNERSHIP*\n\nUntuk mencatat data Partnership, silakan kirimkan pesan baru ke Monalissa dengan format formulir berikut:\n\n`/pt`\n`Instansi: `\n`Persyaratan: `\n`Benefit: `\n`Mulai: `\n`Selesai: `";
+     var keyboard = { inline_keyboard: [[{"text": "🔙 Kembali", "callback_data": "NAV_PEKERJAAN"}]]};
+     UrlFetchApp.fetch("https://api.telegram.org/bot" + token + "/editMessageText", { method: "post", contentType: "application/json", payload: JSON.stringify({ chat_id: String(chatId), message_id: messageId, text: textBaru, parse_mode: "Markdown", reply_markup: keyboard }), muteHttpExceptions: true });
+     return UrlFetchApp.fetch("https://api.telegram.org/bot" + token + "/answerCallbackQuery?callback_query_id=" + callbackQuery.id);
+  }
+
+  // --- NAVIGASI LEVEL 2 (INFORMASI) ---
+  if (action === "NAV_INFO_UNDANGAN") {
+     var textBaru = "📅 *INFO UNDANGAN*\nSilakan pilih informasi yang ingin kamu lihat:";
+     var keyboard = { inline_keyboard: [
+         [{"text": "📅 Mendatang", "callback_data": "ACTION_INFO|mendatang"}],
+         [{"text": "📆 Rekap Bulanan", "callback_data": "MENU_CEK_JADWAL"}],
+         [{"text": "🔙 Kembali", "callback_data": "NAV_INFORMASI"}]
+     ] };
+     UrlFetchApp.fetch("https://api.telegram.org/bot" + token + "/editMessageText", { method: "post", contentType: "application/json", payload: JSON.stringify({ chat_id: String(chatId), message_id: messageId, text: textBaru, parse_mode: "Markdown", reply_markup: keyboard }), muteHttpExceptions: true });
+     return UrlFetchApp.fetch("https://api.telegram.org/bot" + token + "/answerCallbackQuery?callback_query_id=" + callbackQuery.id);
+  }
+
+  if (action === "NAV_INFO_MEDPART") {
+     clearWizardMessages(chatId, userIdCallback);
+     UrlFetchApp.fetch("https://api.telegram.org/bot" + token + "/deleteMessage", { method: "post", contentType: "application/json", payload: JSON.stringify({ chat_id: String(chatId), message_id: messageId }), muteHttpExceptions: true });
+     handleInfoCommand(chatId, "/info medpart");
+     return UrlFetchApp.fetch("https://api.telegram.org/bot" + token + "/answerCallbackQuery?callback_query_id=" + callbackQuery.id);
+  }
+
+  if (action === "NAV_INFO_SPONSOR") {
+     var textBaru = "💰 *INFO SPONSORSHIP*\n\nBelum ada rekap otomatis untuk modul ini. Cek spreadsheet untuk data detail.";
+     var keyboard = { inline_keyboard: [[{"text": "🔙 Kembali", "callback_data": "NAV_INFORMASI"}]] };
+     UrlFetchApp.fetch("https://api.telegram.org/bot" + token + "/editMessageText", { method: "post", contentType: "application/json", payload: JSON.stringify({ chat_id: String(chatId), message_id: messageId, text: textBaru, parse_mode: "Markdown", reply_markup: keyboard }), muteHttpExceptions: true });
+     return UrlFetchApp.fetch("https://api.telegram.org/bot" + token + "/answerCallbackQuery?callback_query_id=" + callbackQuery.id);
+  }
+
+  if (action === "NAV_INFO_PARTNER") {
+     var textBaru = "🔗 *INFO PARTNERSHIP*\n\nBelum ada rekap otomatis untuk modul ini. Cek spreadsheet untuk data detail.";
+     var keyboard = { inline_keyboard: [[{"text": "🔙 Kembali", "callback_data": "NAV_INFORMASI"}]] };
+     UrlFetchApp.fetch("https://api.telegram.org/bot" + token + "/editMessageText", { method: "post", contentType: "application/json", payload: JSON.stringify({ chat_id: String(chatId), message_id: messageId, text: textBaru, parse_mode: "Markdown", reply_markup: keyboard }), muteHttpExceptions: true });
+     return UrlFetchApp.fetch("https://api.telegram.org/bot" + token + "/answerCallbackQuery?callback_query_id=" + callbackQuery.id);
+  }
+
+  if (action === "MENU_UPLOAD_FOTO_UNDANGAN") {
+     var textBaru = "📸 *UNGGAH BUKTI KEHADIRAN*\n\nSilakan kirimkan 1 foto di chat ini lalu berikan caption dengan format:\n`/f ID_Surat`\n\nContoh caption:\n`/f U01`";
+     var keyboard = { inline_keyboard: [[{"text": "🔙 Batal", "callback_data": "NAV_PEKERJAAN_UNDANGAN"}]]};
+     UrlFetchApp.fetch("https://api.telegram.org/bot" + token + "/editMessageText", { method: "post", contentType: "application/json", payload: JSON.stringify({ chat_id: String(chatId), message_id: messageId, text: textBaru, parse_mode: "Markdown", reply_markup: keyboard }), muteHttpExceptions: true });
+     return UrlFetchApp.fetch("https://api.telegram.org/bot" + token + "/answerCallbackQuery?callback_query_id=" + callbackQuery.id);
+  }
+
+  if (action === "MENU_EDIT_UNDANGAN") {
+    var textBaru = "⚙️ *EDIT DATA UNDANGAN*\n\nSilakan ketik *ID Surat / Undangan* yang datanya ingin diubah.\n_(Misalnya: U01, U12, U45)_";
+    var keyboard = { "inline_keyboard": [[{"text": "🔙 Batal", "callback_data": "NAV_PEKERJAAN_UNDANGAN"}]] };
+    UrlFetchApp.fetch("https://api.telegram.org/bot" + token + "/editMessageText", { method: "post", contentType: "application/json", payload: JSON.stringify({ chat_id: String(chatId), message_id: messageId, text: textBaru, parse_mode: "Markdown", reply_markup: keyboard }), muteHttpExceptions: true });
+    
+    var cache = CacheService.getScriptCache();
+    cache.put("WIZ_STATE_" + userIdCallback, "WIZ_EDIT_UND_ID", 600);
+    trackMsg(userIdCallback, messageId);
+    return UrlFetchApp.fetch("https://api.telegram.org/bot" + token + "/answerCallbackQuery?callback_query_id=" + callbackQuery.id);
+  }
+
+  if (action === "EDIT_UND_PILIH") {
+     var idSurat = parts[1];
+     var textBaru = "⚙️ *Edit Undangan " + idSurat + "*\n\nData apa yang ingin kamu ubah?";
+     var keyboard = { inline_keyboard: [
+         [{ text: "🏢 Pengirim", callback_data: "EDIT_UND_SET|PENGIRIM|" + idSurat }],
+         [{ text: "📝 Kegiatan", callback_data: "EDIT_UND_SET|KEGIATAN|" + idSurat }],
+         [{ text: "🗓️ Tanggal & Waktu", callback_data: "EDIT_UND_SET|WAKTU|" + idSurat }],
+         [{ text: "📍 Lokasi", callback_data: "EDIT_UND_SET|LOKASI|" + idSurat }],
+         [{ text: "🔙 Batal", callback_data: "MENU_EDIT_UNDANGAN" }]
+     ]};
+     UrlFetchApp.fetch("https://api.telegram.org/bot" + token + "/editMessageText", { method: "post", contentType: "application/json", payload: JSON.stringify({ chat_id: String(chatId), message_id: messageId, text: textBaru, parse_mode: "Markdown", reply_markup: keyboard }), muteHttpExceptions: true });
+     return UrlFetchApp.fetch("https://api.telegram.org/bot" + token + "/answerCallbackQuery?callback_query_id=" + callbackQuery.id);
+  }
+
+  if (action === "EDIT_UND_SET") {
+     var field = parts[1];
+     var idSurat = parts[2];
+     var textBaru = "";
+     var state = "";
+     if (field === "PENGIRIM") {
+        textBaru = "🏢 Silakan ketik nama *Pengirim* baru untuk " + idSurat + ".";
+        state = "WIZ_EDIT_UND|PENGIRIM|" + idSurat;
+     } else if (field === "KEGIATAN") {
+        textBaru = "📝 Silakan ketik *Nama Kegiatan* baru untuk " + idSurat + ".";
+        state = "WIZ_EDIT_UND|KEGIATAN|" + idSurat;
+     } else if (field === "WAKTU") {
+        textBaru = "🗓️ Mau diubah ke *Tanggal & Waktu* berapa?\n_(misal: 02/11 08:00)_";
+        state = "WIZ_EDIT_UND|WAKTU|" + idSurat;
+     } else if (field === "LOKASI") {
+        textBaru = "📍 Silakan ketik *Lokasi* baru untuk " + idSurat + ".";
+        state = "WIZ_EDIT_UND|LOKASI|" + idSurat;
+     }
+     var keyboard = { inline_keyboard: [[{ text: "🔙 Batal", callback_data: "EDIT_UND_PILIH|" + idSurat }]]};
+     UrlFetchApp.fetch("https://api.telegram.org/bot" + token + "/editMessageText", { method: "post", contentType: "application/json", payload: JSON.stringify({ chat_id: String(chatId), message_id: messageId, text: textBaru, parse_mode: "Markdown", reply_markup: keyboard }), muteHttpExceptions: true });
+     var cache = CacheService.getScriptCache();
+     cache.put("WIZ_STATE_" + userIdCallback, state, 600);
+     trackMsg(userIdCallback, messageId);
+     return UrlFetchApp.fetch("https://api.telegram.org/bot" + token + "/answerCallbackQuery?callback_query_id=" + callbackQuery.id);
+  }
+
+  if (action === "MENU_UPDATE_MEDPART_LIST") {
+    var textBaru = "⚙️ *UPDATE MEDIA PARTNER*\n\nSilakan ketik *ID Media Partner* yang datanya ingin dilengkapi/diedit.\n_(Misalnya: M01, M05, M12)_";
+    var keyboard = { "inline_keyboard": [[{"text": "🔙 Batal", "callback_data": "NAV_PEKERJAAN_MEDPART"}]] };
+    UrlFetchApp.fetch("https://api.telegram.org/bot" + token + "/editMessageText", { method: "post", contentType: "application/json", payload: JSON.stringify({ chat_id: String(chatId), message_id: messageId, text: textBaru, parse_mode: "Markdown", reply_markup: keyboard }), muteHttpExceptions: true });
+    
+    var cache = CacheService.getScriptCache();
+    cache.put("WIZ_STATE_" + userIdCallback, "WIZ_EDIT_MP_ID", 600);
+    trackMsg(userIdCallback, messageId);
     return UrlFetchApp.fetch("https://api.telegram.org/bot" + token + "/answerCallbackQuery?callback_query_id=" + callbackQuery.id);
   }
 
@@ -1517,7 +1787,7 @@ function prosesDelegasiSheet(chatId, idSuratDicari, namaBaku) {
      if (delegasiSekarang === "") {
         selDelegasi.setValue(namaBaku);
         updateRekapDelegasi(namaBaku); 
-        sendMessage(chatId, "✅ *DELEGASI DICATAT!*\n\n*ID:* " + idSuratDicari + "\n*Delegasi:* " + namaBaku);
+        kirimBalasanGanda(chatId, "✅ *DELEGASI DICATAT!*\n\n*ID:* " + idSuratDicari + "\n*Delegasi:* " + namaBaku);
      } else {
         if (delegasiSekarang.indexOf(namaBaku) !== -1) {
            sendMessage(chatId, "⚠️ *" + namaBaku + "*, kamu sudah terdaftar di undangan ini!");
@@ -1525,7 +1795,7 @@ function prosesDelegasiSheet(chatId, idSuratDicari, namaBaku) {
            var delegasiBaru = delegasiSekarang + ", " + namaBaku;
            selDelegasi.setValue(delegasiBaru);
            updateRekapDelegasi(namaBaku); 
-           sendMessage(chatId, "✅ *DELEGASI TAMBAHAN DICATAT!*\n\n*ID:* " + idSuratDicari + "\n*Delegasi Lengkap:*\n" + delegasiBaru);
+           kirimBalasanGanda(chatId, "✅ *DELEGASI TAMBAHAN DICATAT!*\n\n*ID:* " + idSuratDicari + "\n*Delegasi Lengkap:*\n" + delegasiBaru);
         }
      }
   } else {
@@ -1786,8 +2056,12 @@ function clearWizardMessages(chatId, userId, excludeMsgId) {
   }
 }
 
-function kirimMenuUtama(chatId, customText) {
+function kirimMenuUtama(chatId, customText, isAdmin) {
   var cache = CacheService.getScriptCache();
+  
+  if (isAdmin === undefined) {
+      isAdmin = cekMemberGrup(chatId).isAdmin;
+  }
   
   // Hapus menu lama jika ada (agar tidak melompat-lompat / menumpuk)
   var lastMenuId = cache.get("LAST_MENU_" + chatId);
@@ -1800,11 +2074,16 @@ function kirimMenuUtama(chatId, customText) {
      cache.remove("LAST_MENU_" + chatId);
   }
 
+  var inlineKbd = [
+    [{"text": "🏢 Pekerjaan", "callback_data": "NAV_PEKERJAAN"}, {"text": "📊 Informasi", "callback_data": "NAV_INFORMASI"}]
+  ];
+  
+  if (isAdmin) {
+      inlineKbd.push([{"text": "🛠️ Admin", "callback_data": "NAV_ADMIN"}]);
+  }
+
   var keyboard = {
-    "inline_keyboard": [
-      [{"text": "📝 Input Undangan Baru", "callback_data": "MENU_INPUT_UNDANGAN"}, {"text": "🤝 Input Medpart", "callback_data": "MENU_INPUT_MEDPART"}],
-      [{"text": "📊 Cek Info", "callback_data": "MENU_CEK_JADWAL"}, {"text": "👥 Daftar Delegasi", "callback_data": "MENU_DAFTAR_DELEGASI"}]
-    ]
+    "inline_keyboard": inlineKbd
   };
   var botMsgId = sendMessage(chatId, customText || "Selamat datang di *Menu Interaktif Monalissa*! 💅\nSilakan pilih menu di bawah ini:", keyboard);
   if (botMsgId) cache.put("LAST_MENU_" + chatId, String(botMsgId), 21600);
@@ -2054,6 +2333,126 @@ function processWizardInput(chatId, userId, text, userMessageId, msg) {
      return true;
   }
 
+  if (userState.startsWith("WIZ_EDIT_UND|")) {
+     var parts = userState.split("|");
+     var field = parts[1];
+     var idSurat = parts[2];
+     
+     cache.remove("WIZ_STATE_" + userId);
+     trackMsg(userId, userMessageId);
+     
+     var sheet = SpreadsheetApp.openById(sheetId).getSheetByName("Undangan");
+     var dataAll = sheet.getDataRange().getValues();
+     var baris = -1;
+     for (var i = 0; i < dataAll.length; i++) {
+         if (dataAll[i][1] === idSurat) { baris = i + 1; break; }
+     }
+     
+     if (baris !== -1) {
+         if (field === "PENGIRIM") {
+             sheet.getRange(baris, 4).setValue(text.toUpperCase());
+             clearWizardMessages(chatId, userId);
+             kirimMenuUtama(chatId, "✅ Pengirim untuk *" + idSurat + "* berhasil diubah menjadi: *" + text.toUpperCase() + "*");
+         } else if (field === "KEGIATAN") {
+             sheet.getRange(baris, 5).setValue(smartTitleCase(text));
+             clearWizardMessages(chatId, userId);
+             kirimMenuUtama(chatId, "✅ Kegiatan untuk *" + idSurat + "* berhasil diubah menjadi: *" + smartTitleCase(text) + "*");
+         } else if (field === "WAKTU") {
+             var val = text;
+             if(val.toLowerCase().indexOf("wib") === -1) val += " WIB";
+             sheet.getRange(baris, 6).setValue(val);
+             clearWizardMessages(chatId, userId);
+             kirimMenuUtama(chatId, "✅ Waktu untuk *" + idSurat + "* berhasil diubah menjadi: *" + val + "*");
+         } else if (field === "LOKASI") {
+             sheet.getRange(baris, 7).setValue(smartTitleCase(text));
+             clearWizardMessages(chatId, userId);
+             kirimMenuUtama(chatId, "✅ Lokasi untuk *" + idSurat + "* berhasil diubah menjadi: *" + smartTitleCase(text) + "*");
+         }
+     } else {
+         kirimMenuUtama(chatId, "❌ Gagal: Data " + idSurat + " tidak ditemukan!");
+     }
+     return true;
+  }
+
+  if (userState === "WIZ_EDIT_MP_ID") {
+     var idMpRaw = text.trim().toUpperCase();
+     var idMp = idMpRaw;
+     if (!idMp.startsWith("M")) idMp = "M" + idMp.padStart(2, '0');
+     
+     var sheetMp = SpreadsheetApp.openById(sheetId).getSheetByName("Medpart") || SpreadsheetApp.openById(sheetId).getSheetByName("Media Partner");
+     var dataAll = sheetMp.getDataRange().getValues();
+     var found = false;
+     var instansi = "";
+     for (var i = 0; i < dataAll.length; i++) {
+         if (dataAll[i][1] === idMp) { 
+             found = true; 
+             instansi = dataAll[i][3];
+             break; 
+         }
+     }
+     
+     if (!found) {
+         var errId = sendMessage(chatId, "❌ Gagal: ID Media Partner *" + idMp + "* tidak ditemukan!\nSilakan ketik ulang ID yang benar atau ketik `/batal`.");
+         trackMsg(userId, errId);
+         return true;
+     }
+     
+     cache.remove("WIZ_STATE_" + userId);
+     
+     var textBaru = "⚙️ *Edit Media Partner " + idMp + " (" + instansi + ")*\n\nBagian mana yang ingin kamu lengkapi atau ubah?";
+     var keyboard = { inline_keyboard: [
+         [{ text: "🔗 Syarat (Link Bukti)", callback_data: "MEDPART_SET|SYARAT|" + idMp }],
+         [{ text: "🖼️ Poster Final (Foto)", callback_data: "MEDPART_SET|POSTER|" + idMp }],
+         [{ text: "🗓️ Tanggal Upload", callback_data: "MEDPART_SET|TGL|" + idMp }],
+         [{ text: "🔙 Batal", callback_data: "MENU_UPDATE_MEDPART_LIST" }]
+     ]};
+     
+     clearWizardMessages(chatId, userId);
+     var botMsgId = sendMessage(chatId, textBaru, keyboard);
+     if (botMsgId) cache.put("LAST_MENU_" + chatId, String(botMsgId), 21600);
+     return true;
+  }
+
+  if (userState === "WIZ_EDIT_UND_ID") {
+     var idSuratRaw = text.trim().toUpperCase();
+     var idSurat = idSuratRaw;
+     if (!idSurat.startsWith("U")) idSurat = "U" + idSurat.padStart(2, '0');
+     
+     var sheet = SpreadsheetApp.openById(sheetId).getSheetByName("Undangan");
+     var dataAll = sheet.getDataRange().getValues();
+     var found = false;
+     var instansi = "";
+     for (var i = 0; i < dataAll.length; i++) {
+         if (dataAll[i][1] === idSurat) { 
+             found = true; 
+             instansi = dataAll[i][3];
+             break; 
+         }
+     }
+     
+     if (!found) {
+         var errId = sendMessage(chatId, "❌ Gagal: ID Undangan *" + idSurat + "* tidak ditemukan!\nSilakan ketik ulang ID yang benar atau ketik `/batal`.");
+         trackMsg(userId, errId);
+         return true;
+     }
+     
+     cache.remove("WIZ_STATE_" + userId);
+     
+     var textBaru = "⚙️ *Edit Undangan " + idSurat + " (" + instansi + ")*\n\nData apa yang ingin kamu ubah?";
+     var keyboard = { inline_keyboard: [
+         [{ text: "🏢 Pengirim", callback_data: "EDIT_UND_SET|PENGIRIM|" + idSurat }],
+         [{ text: "📝 Kegiatan", callback_data: "EDIT_UND_SET|KEGIATAN|" + idSurat }],
+         [{ text: "🗓️ Tanggal & Waktu", callback_data: "EDIT_UND_SET|WAKTU|" + idSurat }],
+         [{ text: "📍 Lokasi", callback_data: "EDIT_UND_SET|LOKASI|" + idSurat }],
+         [{ text: "🔙 Batal", callback_data: "MENU_EDIT_UNDANGAN" }]
+     ]};
+     
+     clearWizardMessages(chatId, userId);
+     var botMsgId = sendMessage(chatId, textBaru, keyboard);
+     if (botMsgId) cache.put("LAST_MENU_" + chatId, String(botMsgId), 21600);
+     return true;
+  }
+
   return false; // State tidak dikenali
 }
 
@@ -2150,21 +2549,10 @@ function handleInfoCommand(chatId, inputInfo) {
       
       var finalMp = "🤝 *STATUS MEDIA PARTNER TERKINI* 🤝\n\n" + listMp;
       
-      var keyboardEdit = { inline_keyboard: [] };
-      var row = [];
-      for (var i = 2; i < dataMp.length; i++) {
-         var idMp = dataMp[i][1];
-         var instansi = dataMp[i][3];
-         if (idMp && instansi) {
-             if (row.length === 3) {
-                 keyboardEdit.inline_keyboard.push(row);
-                 row = [];
-             }
-             row.push({ text: "✏️ " + idMp, callback_data: "MEDPART_EDIT|" + idMp });
-         }
-      }
-      if (row.length > 0) keyboardEdit.inline_keyboard.push(row);
-      keyboardEdit.inline_keyboard.push([{ text: "🔙 Kembali ke Menu", callback_data: "MENU_CEK_JADWAL" }]);
+      var keyboardEdit = { inline_keyboard: [
+          [{ text: "⚙️ Update Mediapartner", callback_data: "MENU_UPDATE_MEDPART_LIST" }],
+          [{ text: "🔙 Kembali", callback_data: "NAV_INFORMASI" }]
+      ] };
       
       var botMsgId = null;
       if (finalMp.length > 4000) {
