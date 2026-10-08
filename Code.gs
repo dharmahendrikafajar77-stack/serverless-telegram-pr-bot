@@ -666,45 +666,6 @@ function processUpdate(update) {
      return;
   }
 
-  // 6. UPLOAD BUKTI FOTO KEHADIRAN UNDANGAN (/f)
-  if (text.startsWith("/f ") || text === "/f") {
-    if (!msg.photo) {
-       return sendMessage(chatId, "❌ *Foto tidak terdeteksi!*\n\nKamu harus mengirimkan foto bukti kehadiran bersamaan dengan perintah ini di kolom caption.\nContoh caption: `/f U01`");
-    }
-    
-    var idSuratFoto = text.replace("/f", "").trim().toUpperCase();
-    if (idSuratFoto === "") return sendMessage(chatId, "❌ Format salah! Jangan lupa masukkan ID Surat.\nContoh caption: `/f U01`");
-
-    var fileIdTelegram = msg.photo[msg.photo.length - 1].file_id;
-    
-    var fileDataUrl = "https://api.telegram.org/bot" + token + "/getFile?file_id=" + fileIdTelegram;
-    var response = UrlFetchApp.fetch(fileDataUrl);
-    var filePath = JSON.parse(response.getContentText()).result.file_path;
-    var downloadUrl = "https://api.telegram.org/file/bot" + token + "/" + filePath;
-    var blob = UrlFetchApp.fetch(downloadUrl).getBlob();
-    
-    var folder = DriveApp.getFolderById(folderId);
-    var savedFile = folder.createFile(blob);
-    savedFile.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
-    
-    var fileIdDrive = savedFile.getId();
-    var directImageUrl = "https://drive.google.com/uc?export=view&id=" + fileIdDrive;
-    
-    var sheet = SpreadsheetApp.openById(sheetId).getSheetByName("Undangan");
-    var dataAll = sheet.getDataRange().getValues();
-    var barisDitemukan = -1;
-    for (var i = 0; i < dataAll.length; i++) {
-        if (dataAll[i][1] === idSuratFoto) { barisDitemukan = i + 1; break; }
-    }
-    
-    if(barisDitemukan !== -1) {
-      sheet.getRange(barisDitemukan, 9).setFormula('=IMAGE("' + directImageUrl + '")');
-      kirimBalasanGanda(chatId, "📸 *Bukti Kehadiran Berhasil Diupload!*\n\nTerima kasih atas laporannya. Fotonya sudah dipajang cantik oleh Monalissa di database PR! 💅\n_Surat ID: " + idSuratFoto + "_");
-    } else {
-      sendMessage(chatId, "❌ Foto gagal diproses: ID Surat *" + idSuratFoto + "* tidak ditemukan di database.");
-    }
-    return;
-  }
 
   // ==========================================
   // FITUR UPLOAD POSTER MEDIA PARTNER (/fmp)
@@ -740,7 +701,11 @@ function processUpdate(update) {
     if(barisDitemukan !== -1) {
       // Kolom ke-8 adalah Poster
       sheetMp.getRange(barisDitemukan, 8).setFormula('=IMAGE("' + directImageUrl + '")');
-      kirimBalasanGanda(chatId, "📸 *Poster Media Partner Berhasil Disimpan!*\n\nKerja bagus! Poster final untuk " + idMpFoto + " sudah diamankan oleh Monalissa.\n\n_Pastikan kamu segera meneruskan (forward) pesan berisi poster ini ke Divisi Design and Media ya!_ 💅");
+      var balasan = "📸 *Poster Media Partner Berhasil Disimpan!*\n\nKerja bagus! Poster final untuk " + idMpFoto + " sudah diamankan oleh Monalissa.\n\n_Pastikan kamu segera meneruskan (forward) pesan berisi poster ini ke Divisi Design and Media ya!_ 💅";
+      sendMessage(chatId, balasan);
+      if (grupChatId && String(chatId) !== String(grupChatId)) {
+          sendPhoto(grupChatId, fileIdTelegram, balasan);
+      }
     } else {
       sendMessage(chatId, "❌ Foto gagal diproses: ID Medpart *" + idMpFoto + "* tidak ditemukan di database.");
     }
@@ -1021,6 +986,21 @@ function sendMessage(chatId, text, replyMarkup) {
   } catch(e) {
     console.error("HTTP Fetch Error: " + e.message);
   }
+  return null;
+}
+
+function sendPhoto(chatId, photoUrlOrFileId, caption, replyMarkup) {
+  var url = "https://api.telegram.org/bot" + token + "/sendPhoto";
+  var payload = { "chat_id": String(chatId), "photo": photoUrlOrFileId, "caption": caption, "parse_mode": "Markdown" };
+  if (replyMarkup) {
+    payload.reply_markup = replyMarkup;
+  }
+  var options = { "method": "post", "contentType": "application/json", "payload": JSON.stringify(payload), "muteHttpExceptions": true };
+  try {
+    var response = UrlFetchApp.fetch(url, options);
+    var json = JSON.parse(response.getContentText());
+    if (json.ok) return json.result.message_id;
+  } catch(e) {}
   return null;
 }
 
@@ -1653,9 +1633,56 @@ function handleCallback(callbackQuery) {
   }
 
   if (action === "MENU_UPLOAD_FOTO_UNDANGAN") {
-     var textBaru = "📸 *UNGGAH BUKTI KEHADIRAN*\n\nSilakan kirimkan 1 foto di chat ini lalu berikan caption dengan format:\n`/f ID_Surat`\n\nContoh caption:\n`/f U01`";
-     var keyboard = { inline_keyboard: [[{"text": "🔙 Batal", "callback_data": "NAV_PEKERJAAN_UNDANGAN"}]]};
+    var sheet = SpreadsheetApp.openById(sheetId).getSheetByName("Undangan");
+    var data = sheet.getDataRange().getValues();
+    var buttons = [];
+    var hariIni = new Date();
+    hariIni.setHours(0,0,0,0);
+    hariIni.setDate(hariIni.getDate() - 7);
+    var tahunIni = hariIni.getFullYear();
+    
+    for(var i = Math.max(2, data.length - 40); i < data.length; i++) {
+        var idSurat = data[i][1];
+        var uk = data[i][3];
+        var waktu = data[i][5];
+        var foto = data[i][8] ? String(data[i][8]).trim() : "";
+        if (idSurat && waktu && foto === "") {
+            var tglAcara;
+            if (waktu instanceof Date) tglAcara = new Date(waktu);
+            else {
+               var parts = String(waktu).trim().split(" ")[0].split(/[-/]/);
+               if(parts.length >= 2) tglAcara = new Date(tahunIni, parseInt(parts[1])-1, parseInt(parts[0]));
+            }
+            if (tglAcara) {
+                tglAcara.setHours(0,0,0,0);
+                if (tglAcara.getTime() >= hariIni.getTime()) {
+                    buttons.push([{"text": "📸 " + idSurat + " - " + uk, "callback_data": "UPLOAD_FOTO_PILIH|" + idSurat}]);
+                }
+            }
+        }
+    }
+    
+    var textBaru = "📸 *UNGGAH BUKTI KEHADIRAN*\n\nSilakan pilih undangan yang fotonya ingin kamu unggah:";
+    if (buttons.length === 0) textBaru = "✨ Wah, semua undangan terbaru sudah memiliki foto bukti kehadiran atau tidak ada jadwal terdekat!";
+    
+    buttons.push([{"text": "🔙 Batal", "callback_data": "NAV_PEKERJAAN_UNDANGAN"}]);
+    var keyboard = { "inline_keyboard": buttons };
+    
+    UrlFetchApp.fetch("https://api.telegram.org/bot" + token + "/editMessageText", { method: "post", contentType: "application/json", payload: JSON.stringify({ chat_id: String(chatId), message_id: messageId, text: textBaru, parse_mode: "Markdown", reply_markup: keyboard }), muteHttpExceptions: true });
+    return UrlFetchApp.fetch("https://api.telegram.org/bot" + token + "/answerCallbackQuery?callback_query_id=" + callbackQuery.id);
+  }
+
+  if (action === "UPLOAD_FOTO_PILIH") {
+     var idSurat = parts[1];
+     var textBaru = "📸 *Unggah Foto untuk " + idSurat + "*\n\nSilakan kirimkan *1 foto* (berupa gambar, bukan dokumen file) di chat ini sekarang juga.";
+     var keyboard = { "inline_keyboard": [[{"text": "🔙 Batal", "callback_data": "MENU_UPLOAD_FOTO_UNDANGAN"}]] };
+     
      UrlFetchApp.fetch("https://api.telegram.org/bot" + token + "/editMessageText", { method: "post", contentType: "application/json", payload: JSON.stringify({ chat_id: String(chatId), message_id: messageId, text: textBaru, parse_mode: "Markdown", reply_markup: keyboard }), muteHttpExceptions: true });
+     
+     var cache = CacheService.getScriptCache();
+     cache.put("WIZ_STATE_" + userIdCallback, "WIZ_FOTO_UND|" + idSurat, 600);
+     trackMsg(userIdCallback, messageId);
+     
      return UrlFetchApp.fetch("https://api.telegram.org/bot" + token + "/answerCallbackQuery?callback_query_id=" + callbackQuery.id);
   }
 
@@ -2194,7 +2221,7 @@ function processWizardInput(chatId, userId, text, userMessageId, msg) {
     
     clearWizardMessages(chatId, userId);
 
-    var balasan = "🚨 *UNDANGAN BARU MASUK!* 🚨\n_(via Menu Interaktif 🍀)_\n\n*ID Surat:* " + idSurat + "\n*UK Pengirim:* " + pengirim + "\n*Kegiatan:* " + kegiatan + "\n*Waktu:* " + waktuTampil + "\n*Lokasi:* " + lokasi + "\n\n👥 _Siapa yang bersedia? Balas pesan ini:_ \n`/a " + idSurat + " Nama_Kamu`";
+    var balasan = "🚨 *UNDANGAN BARU MASUK!* 🚨\n_(via Menu Interaktif 🍀)_\n\n*ID Surat:* " + idSurat + "\n*UK Pengirim:* " + pengirim + "\n*Kegiatan:* " + kegiatan + "\n*Waktu:* " + waktuTampil + "\n*Lokasi:* " + lokasi + "\n\n👥 _Siapa yang bersedia? Silakan daftarkan diri lewat *Menu Pekerjaan -> Ambil Delegasi* di Personal Chat (DM) Monalissa._";
     kirimMenuUtama(chatId, balasan);
     
     if (grupChatId && String(chatId) !== String(grupChatId)) {
@@ -2451,6 +2478,56 @@ function processWizardInput(chatId, userId, text, userMessageId, msg) {
      var botMsgId = sendMessage(chatId, textBaru, keyboard);
      if (botMsgId) cache.put("LAST_MENU_" + chatId, String(botMsgId), 21600);
      return true;
+  }
+
+  if (userState.startsWith("WIZ_FOTO_UND|")) {
+      var idSuratFoto = userState.split("|")[1];
+      
+      if (!msg || !msg.photo) {
+          var errId = sendMessage(chatId, "❌ Itu bukan foto! Silakan ulangi dengan mengirimkan foto gambar, atau ketik /batal.");
+          trackMsg(userId, errId);
+          return true;
+      }
+      
+      cache.remove("WIZ_STATE_" + userId);
+      trackMsg(userId, userMessageId);
+      
+      var fileIdTelegram = msg.photo[msg.photo.length - 1].file_id;
+      
+      var fileDataUrl = "https://api.telegram.org/bot" + token + "/getFile?file_id=" + fileIdTelegram;
+      var response = UrlFetchApp.fetch(fileDataUrl);
+      var filePath = JSON.parse(response.getContentText()).result.file_path;
+      var downloadUrl = "https://api.telegram.org/file/bot" + token + "/" + filePath;
+      var blob = UrlFetchApp.fetch(downloadUrl).getBlob();
+      
+      var folder = DriveApp.getFolderById(folderId);
+      var savedFile = folder.createFile(blob);
+      savedFile.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
+      
+      var fileIdDrive = savedFile.getId();
+      var directImageUrl = "https://drive.google.com/uc?export=view&id=" + fileIdDrive;
+      
+      var sheet = SpreadsheetApp.openById(sheetId).getSheetByName("Undangan");
+      var dataAll = sheet.getDataRange().getValues();
+      var barisDitemukan = -1;
+      for (var i = 0; i < dataAll.length; i++) {
+          if (dataAll[i][1] === idSuratFoto) { barisDitemukan = i + 1; break; }
+      }
+      
+      clearWizardMessages(chatId, userId);
+      
+      if(barisDitemukan !== -1) {
+        sheet.getRange(barisDitemukan, 9).setFormula('=IMAGE("' + directImageUrl + '")');
+        var balasan = "📸 *Bukti Kehadiran Berhasil Diupload!*\n\nTerima kasih atas laporannya. Fotonya sudah dipajang cantik oleh Monalissa di database PR! 💅\n_Surat ID: " + idSuratFoto + "_";
+        kirimMenuUtama(chatId, balasan);
+        if (grupChatId && String(chatId) !== String(grupChatId)) {
+            sendPhoto(grupChatId, fileIdTelegram, balasan);
+        }
+      } else {
+        kirimMenuUtama(chatId, "❌ Foto gagal diproses: ID Surat *" + idSuratFoto + "* tidak ditemukan di database.");
+      }
+      
+      return true;
   }
 
   return false; // State tidak dikenali
