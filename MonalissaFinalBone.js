@@ -2561,7 +2561,7 @@ function processWizardInput(chatId, userId, text, userMessageId, msg) {
   
   if (userState === "MEDPART_TGL") {
      var formattedTgl = formatTanggalInput(text);
-     cache.put("WIZ_MP_TGL_" + userId, formattedTgl, 600);
+     cache.put("WIZ_MP_TGL_" + userId, normalizeTanggalString(text), 600);
      var botMsgId = sendMessage(chatId, "✅ Tanggal: *" + formattedTgl + "*\n\nTerakhir, kirimkan *Link GDrive* atau *Bukti Foto* bahwa syarat Medpart sudah terpenuhi!", 
          { inline_keyboard: [[{ text: "⏩ Lewati (Data Belum Ada)", callback_data: "WIZ_SKIP_INPUT" }]] }
      );
@@ -2613,7 +2613,7 @@ function processWizardInput(chatId, userId, text, userMessageId, msg) {
      
      clearWizardMessages(chatId, userId);
      
-     var balasan = "🤝 *MEDPART BARU TERCATAT!* 🤝\n_(via Menu Interaktif 🍀)_\n\n*ID:* " + idSurat + "\n*Instansi:* " + instansi + "\n*Tanggal Upload:* " + tglUpload + "\n*Bukti/Link:* " + bukti;
+     var balasan = "🤝 *MEDPART BARU TERCATAT!* 🤝\n_(via Menu Interaktif 🍀)_\n\n*ID:* " + idSurat + "\n*Instansi:* " + instansi + "\n*Tanggal Upload:* " + formatTanggalInput(tglUpload) + "\n*Bukti/Link:* " + bukti;
      kirimMenuUtama(chatId, balasan);
      if (grupChatId && String(chatId) !== String(grupChatId)) {
        sendMessage(grupChatId, balasan);
@@ -2638,7 +2638,7 @@ function processWizardInput(chatId, userId, text, userMessageId, msg) {
 
   if (userState === "SP_TGL") {
      var formattedTgl = formatTanggalInput(text);
-     cache.put("WIZ_SP_TGL_" + userId, formattedTgl, 600);
+     cache.put("WIZ_SP_TGL_" + userId, normalizeTanggalString(text), 600);
      var botMsgId = sendMessage(chatId, "✅ Tanggal: *" + formattedTgl + "*\n\nApa saja *Persyaratan* dari sponsor tersebut?\n_(Gunakan baris baru (Enter) untuk memisah antar poin)_");
      trackMsg(userId, botMsgId);
      cache.put("WIZ_STATE_" + userId, "SP_SYARAT", 600);
@@ -2711,7 +2711,7 @@ function processWizardInput(chatId, userId, text, userMessageId, msg) {
      
      clearWizardMessages(chatId, userId);
      
-     var balasan = "💰 *SPONSORSHIP BARU TERCATAT!* 💰\n\n*Instansi:* " + smartTitleCase(instansi) + "\n*Tanggal:* " + tgl + "\n*Syarat:* \n" + syarat + "\n*Benefit:* \n" + benefit + "\n*MoU:* " + (mou || "❌ Belum ada data");
+     var balasan = "💰 *SPONSORSHIP BARU TERCATAT!* 💰\n\n*Instansi:* " + smartTitleCase(instansi) + "\n*Tanggal:* " + formatTanggalInput(tgl) + "\n*Syarat:* \n" + syarat + "\n*Benefit:* \n" + benefit + "\n*MoU:* " + (mou || "❌ Belum ada data");
      kirimMenuUtama(chatId, balasan);
      if (grupChatId && String(chatId) !== String(grupChatId)) {
        sendMessage(grupChatId, balasan);
@@ -2751,7 +2751,7 @@ function processWizardInput(chatId, userId, text, userMessageId, msg) {
 
   if (userState === "PT_MULAI") {
      var formattedMulai = formatTanggalInput(text);
-     cache.put("WIZ_PT_MULAI_" + userId, formattedMulai, 600);
+     cache.put("WIZ_PT_MULAI_" + userId, normalizeTanggalString(text), 600);
      var botMsgId = sendMessage(chatId, "✅ Tanggal Mulai: *" + formattedMulai + "*\n\nDan kapan *Tanggal Selesai* kerjasama ini?\n_(Contoh: 12/10 atau 12 Oktober 2026)_");
      trackMsg(userId, botMsgId);
      cache.put("WIZ_STATE_" + userId, "PT_SELESAI", 600);
@@ -2760,7 +2760,7 @@ function processWizardInput(chatId, userId, text, userMessageId, msg) {
 
   if (userState === "PT_SELESAI") {
      var formattedSelesai = formatTanggalInput(text);
-     cache.put("WIZ_PT_SELESAI_" + userId, formattedSelesai, 600);
+     cache.put("WIZ_PT_SELESAI_" + userId, normalizeTanggalString(text), 600);
      var botMsgId = sendMessage(chatId, "✅ Tanggal Selesai: *" + formattedSelesai + "*\n\nTerakhir, kirimkan **Dokumen MoU**.\n_(Harap kirim dalam bentuk File PDF/Word)_", 
          { inline_keyboard: [[{ text: "⏩ Lewati (MoU Belum Ada)", callback_data: "WIZ_SKIP_INPUT" }]] }
      );
@@ -2818,7 +2818,7 @@ function processWizardInput(chatId, userId, text, userMessageId, msg) {
      
      clearWizardMessages(chatId, userId);
      
-     var balasan = "🔗 *PARTNERSHIP BARU TERCATAT!* 🔗\n\n*Instansi:* " + smartTitleCase(instansi) + "\n*Periode:* " + mulai + " - " + selesai + "\n*PoA UKBA:* \n" + syarat + "\n*PoA Eksternal:* \n" + benefit + "\n*MoU:* " + (mou || "❌ Belum ada data");
+     var balasan = "🔗 *PARTNERSHIP BARU TERCATAT!* 🔗\n\n*Instansi:* " + smartTitleCase(instansi) + "\n*Periode:* " + formatTanggalInput(mulai) + " - " + formatTanggalInput(selesai) + "\n*PoA UKBA:* \n" + syarat + "\n*PoA Eksternal:* \n" + benefit + "\n*MoU:* " + (mou || "❌ Belum ada data");
      kirimMenuUtama(chatId, balasan);
      if (grupChatId && String(chatId) !== String(grupChatId)) {
        sendMessage(grupChatId, balasan);
