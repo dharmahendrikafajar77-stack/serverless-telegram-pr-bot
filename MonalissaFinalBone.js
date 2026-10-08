@@ -1344,9 +1344,9 @@ function handleCallback(callbackQuery) {
       var cache = CacheService.getScriptCache();
       var state = cache.get("WIZ_STATE_" + userIdCallback);
       if (state) {
-          var mockMsg = {text: "TBA", from: {id: userIdCallback}};
-          processWizardInput(chatId, userIdCallback, "TBA", null, mockMsg);
-          UrlFetchApp.fetch("https://api.telegram.org/bot" + token + "/answerCallbackQuery?callback_query_id=" + callbackQuery.id + "&text=" + encodeURIComponent("Diisi otomatis: TBA"));
+          var mockMsg = {text: "❌ Belum ada data", from: {id: userIdCallback}};
+          processWizardInput(chatId, userIdCallback, "❌ Belum ada data", null, mockMsg);
+          UrlFetchApp.fetch("https://api.telegram.org/bot" + token + "/answerCallbackQuery?callback_query_id=" + callbackQuery.id + "&text=" + encodeURIComponent("Diisi otomatis: Belum ada data"));
       } else {
           UrlFetchApp.fetch("https://api.telegram.org/bot" + token + "/answerCallbackQuery?callback_query_id=" + callbackQuery.id + "&text=" + encodeURIComponent("Sesi sudah berakhir."));
       }
@@ -2562,7 +2562,9 @@ function processWizardInput(chatId, userId, text, userMessageId, msg) {
   // =====================
   if (userState === "SP_INSTANSI") {
      cache.put("WIZ_SP_INSTANSI_" + userId, text, 600);
-     var botMsgId = sendMessage(chatId, "✅ Instansi: *" + text + "*\n\nKapan *Tanggal/Waktu* pelaksanaannya?\n_(Ketik 'TBA' jika belum pasti)_");
+     var botMsgId = sendMessage(chatId, "✅ Instansi: *" + text + "*\n\nKapan *Tanggal/Waktu* pelaksanaannya?\n_(Contoh: 12 Desember 2026)_",
+         { inline_keyboard: [[{ text: "⏩ Lewati (Belum Pasti)", callback_data: "WIZ_SKIP_INPUT" }]] }
+     );
      trackMsg(userId, botMsgId);
      cache.put("WIZ_STATE_" + userId, "SP_TGL", 600);
      return true;
@@ -2630,7 +2632,7 @@ function processWizardInput(chatId, userId, text, userMessageId, msg) {
      
      clearWizardMessages(chatId, userId);
      
-     var balasan = "💰 *SPONSORSHIP BARU TERCATAT!* 💰\n\n*Instansi:* " + smartTitleCase(instansi) + "\n*Tanggal:* " + tgl + "\n*Syarat:* \n" + syarat + "\n*Benefit:* \n" + benefit + "\n*MoU:* " + (mou || "TBA");
+     var balasan = "💰 *SPONSORSHIP BARU TERCATAT!* 💰\n\n*Instansi:* " + smartTitleCase(instansi) + "\n*Tanggal:* " + tgl + "\n*Syarat:* \n" + syarat + "\n*Benefit:* \n" + benefit + "\n*MoU:* " + (mou || "❌ Belum ada data");
      kirimMenuUtama(chatId, balasan);
      if (grupChatId && String(chatId) !== String(grupChatId)) {
        sendMessage(grupChatId, balasan);
@@ -2720,7 +2722,7 @@ function processWizardInput(chatId, userId, text, userMessageId, msg) {
      
      clearWizardMessages(chatId, userId);
      
-     var balasan = "🔗 *PARTNERSHIP BARU TERCATAT!* 🔗\n\n*Instansi:* " + smartTitleCase(instansi) + "\n*Periode:* " + mulai + " - " + selesai + "\n*PoA UKBA:* \n" + syarat + "\n*PoA Eksternal:* \n" + benefit + "\n*MoU:* " + (mou || "TBA");
+     var balasan = "🔗 *PARTNERSHIP BARU TERCATAT!* 🔗\n\n*Instansi:* " + smartTitleCase(instansi) + "\n*Periode:* " + mulai + " - " + selesai + "\n*PoA UKBA:* \n" + syarat + "\n*PoA Eksternal:* \n" + benefit + "\n*MoU:* " + (mou || "❌ Belum ada data");
      kirimMenuUtama(chatId, balasan);
      if (grupChatId && String(chatId) !== String(grupChatId)) {
        sendMessage(grupChatId, balasan);
