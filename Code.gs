@@ -196,6 +196,20 @@ function processUpdate(update) {
     return;
   }
 
+  if (teksLower === "/clearmenu") {
+     var removeKbd = { "remove_keyboard": true };
+     UrlFetchApp.fetch("https://api.telegram.org/bot" + token + "/sendMessage", { 
+         method: "post", 
+         contentType: "application/json", 
+         payload: JSON.stringify({ 
+             chat_id: String(chatId), 
+             text: "✅ Menu lama berhasil dibersihkan dari grup ini.", 
+             reply_markup: removeKbd 
+         }) 
+     });
+     return;
+  }
+
  if (teksLower === "/tutor") {
     var tutorText = "📚 *PANDUAN LENGKAP MONALISSA* 📚\n\n" +
       "🔹 `/i` *(Input Undangan Baru)*\nKetik langsung:\n`/i Pengirim, Kegiatan, Tgl/Bln, Jam Menit, Lokasi`\n\n" +
@@ -561,7 +575,7 @@ function processUpdate(update) {
      
      var isMedpart = idHapus.startsWith("M");
      var namaSheet = isMedpart ? "Medpart" : "Undangan";
-     var headerRows = isMedpart ? 1 : 2;
+     var headerRows = 2; // Undangan dan Medpart sama-sama pakai 2 baris (Title & Header)
      
      var sheet = SpreadsheetApp.openById(sheetId).getSheetByName(namaSheet);
      if (!sheet && isMedpart) sheet = SpreadsheetApp.openById(sheetId).getSheetByName("Media Partner");
@@ -1359,7 +1373,7 @@ function handleCallback(callbackQuery) {
         if (action === "DELMP_YES") {
            sheetMp.deleteRow(barisDitemukan);
             
-            var headerRows = 1;
+            var headerRows = 2;
             var lastRow = sheetMp.getLastRow();
             var numRows = lastRow - headerRows; 
             if (numRows > 0) {
@@ -1650,7 +1664,7 @@ function handleCallback(callbackQuery) {
       var prefix = "";
       
       if (modul === "UNDANGAN") { namaSheet = "Undangan"; headerRows = 2; hasStringId = true; prefix = "U"; }
-      else if (modul === "MEDPART") { namaSheet = "Medpart"; headerRows = 1; hasStringId = true; prefix = "M"; }
+      else if (modul === "MEDPART") { namaSheet = "Medpart"; headerRows = 2; hasStringId = true; prefix = "M"; }
       else if (modul === "SPONSOR") { namaSheet = "Sponsorship"; headerRows = 1; } 
       else if (modul === "PARTNER") { namaSheet = "Partnership"; headerRows = 1; }
       
@@ -2251,8 +2265,9 @@ function processWizardInput(chatId, userId, text, userMessageId, msg) {
   var cache = CacheService.getScriptCache();
   var userState = cache.get("WIZ_STATE_" + userId);
 
-  // ---- PERINTAH BATAL WIZARD (Fallback via Teks) ----
-  if (text && text.toLowerCase() === "/batal") {
+  // ---- INTERCEPT CLOVER MENU SAAT SEDANG WIZARD ----
+  var isMenuButton = text && (text === "🏢 Pekerjaan" || text === "📊 Informasi" || text === "🛠️ Admin");
+  if (text && (text.toLowerCase() === "/batal" || isMenuButton)) {
     if (userState !== null) {
       cache.remove("WIZ_STATE_" + userId);
       cache.remove("WIZ_PENGIRIM_" + userId);
@@ -2263,8 +2278,9 @@ function processWizardInput(chatId, userId, text, userMessageId, msg) {
       trackMsg(userId, userMessageId);
       clearWizardMessages(chatId, userId);
       
-      kirimMenuUtama(chatId, "❌ Proses input dibatalkan.");
+      if (!isMenuButton) kirimMenuUtama(chatId, "❌ Proses input dibatalkan.");
     }
+    if (isMenuButton) return false; // Lanjut ke Clover Handler di bawah
     return true;
   }
   
@@ -2405,7 +2421,7 @@ function processWizardInput(chatId, userId, text, userMessageId, msg) {
      
      if(sheet) {
         var barisTujuan = sheet.getLastRow() + 1;
-        sheet.appendRow([barisTujuan - 1, idSurat, waktuDiterima, instansi, bukti, tglUpload, "", ""]);
+        sheet.appendRow([barisTujuan - 2, idSurat, waktuDiterima, instansi, bukti, tglUpload, "", ""]);
      }
      
      clearWizardMessages(chatId, userId);
