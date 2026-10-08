@@ -2653,9 +2653,21 @@ function processWizardInput(chatId, userId, text, userMessageId, msg) {
         return true;
      }
      
+     var maxID = 0;
+     var lr = sheetSp.getLastRow();
+     if (lr >= 3) { // Start from row 3
+        var dataID = sheetSp.getRange("B3:B" + lr).getValues();
+        for (var i = 0; i < dataID.length; i++) {
+          var idSekarang = dataID[i][0].toString().replace("S", "");
+          var angkaID = parseInt(idSekarang, 10);
+          if (!isNaN(angkaID) && angkaID > maxID) maxID = angkaID;
+        }
+     }
+     var idSp = "S" + String(maxID + 1).padStart(2, '0');
+     
      var barisTujuan = sheetSp.getLastRow() + 1;
      var nomorUrut = barisTujuan > 2 ? barisTujuan - 2 : 1; 
-     sheetSp.appendRow([nomorUrut, smartTitleCase(instansi), tgl, syarat, benefit, mou]);
+     sheetSp.appendRow([nomorUrut, idSp, smartTitleCase(instansi), tgl, syarat, benefit, mou]);
      
      clearWizardMessages(chatId, userId);
      
@@ -2746,9 +2758,23 @@ function processWizardInput(chatId, userId, text, userMessageId, msg) {
         return true;
      }
      
+     var maxID = 0;
+     var lr = sheetPt.getLastRow();
+     if (lr >= 3) {
+        var dataID = sheetPt.getRange("B3:B" + lr).getValues();
+        for (var i = 0; i < dataID.length; i++) {
+          var idSekarang = dataID[i][0].toString().replace("P", "");
+          var angkaID = parseInt(idSekarang, 10);
+          if (!isNaN(angkaID) && angkaID > maxID) maxID = angkaID;
+        }
+     }
+     var idPrt = "P" + String(maxID + 1).padStart(2, '0');
+     
      var barisTujuan = sheetPt.getLastRow() + 1;
      var nomorUrut = barisTujuan > 2 ? barisTujuan - 2 : 1;
-     sheetPt.appendRow([nomorUrut, smartTitleCase(instansi), syarat, benefit, mulai, selesai, mou]);
+     
+     // Asumsi urutan kolom: NO, ID Partner, Instansi, Tgl Mulai, Tgl Selesai, PoA UKBA, PoA Eksternal, MoU
+     sheetPt.appendRow([nomorUrut, idPrt, smartTitleCase(instansi), mulai, selesai, syarat, benefit, mou]);
      
      clearWizardMessages(chatId, userId);
      
