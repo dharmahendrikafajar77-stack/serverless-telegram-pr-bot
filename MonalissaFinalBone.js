@@ -2556,8 +2556,6 @@ function processWizardInput(chatId, userId, text, userMessageId, msg) {
      return true;
   }
 
-      return true;
-  }
 
   // =====================
   // TAHAP INPUT SPONSORSHIP
