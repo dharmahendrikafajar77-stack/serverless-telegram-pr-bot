@@ -115,7 +115,7 @@ function processUpdate(update) {
   }
 
   // 1. KOTAK PANDUAN (/start & /tutor) & GATEWAY DM
-  if (teksLower === "/start" || teksLower === "hey" || text === "🏢 Pekerjaan" || text === "📊 Informasi" || text === "🛠️ Admin") {
+  if (teksLower === "/start" || teksLower === "hey") {
     
     if (isPrivateChat) {
        var cekGrup = cekMemberGrup(userId);
@@ -148,6 +148,48 @@ function processUpdate(update) {
        return;
     }
   }
+
+  // 1b. DIRECT CLOVER MENU HANDLER
+  if (isPrivateChat && (text === "🏢 Pekerjaan" || text === "📊 Informasi" || text === "🛠️ Admin")) {
+     var cekGrup = cekMemberGrup(userId);
+     if (!cekGrup.isMember) return sendMessage(chatId, "❌ Maaf, kamu tidak terdeteksi sebagai anggota Grup PR UKBA. Akses ditolak! 💅");
+     
+     var dataUserVerif = verifikasiMember(userId);
+     if (!dataUserVerif.verified) return sendMessage(chatId, "👋 Halo! Kamu sudah terdeteksi sebagai anggota Grup PR, tapi Monalissa belum tahu namamu.\n\nSilakan daftarkan dirimu dengan mengetik:\n`/daftar Nama Lengkap Kamu`\n_(Pastikan sesuai dengan SK Pengurus)_ 💅");
+     
+     if (text === "🏢 Pekerjaan") {
+         var textBaru = "🏢 *MODUL PEKERJAAN*\nSilakan pilih modul yang ingin dikerjakan:";
+         var keyboard = { inline_keyboard: [
+             [{"text": "📩 Undangan", "callback_data": "NAV_PEKERJAAN_UNDANGAN"}, {"text": "🤝 Media Partner", "callback_data": "NAV_PEKERJAAN_MEDPART"}],
+             [{"text": "💰 Sponsorship", "callback_data": "NAV_PEKERJAAN_SPONSOR"}, {"text": "🔗 Partnership", "callback_data": "NAV_PEKERJAAN_PARTNER"}],
+             [{"text": "🔙 Menu Utama", "callback_data": "MENU_KEMBALI"}]
+         ]};
+         var botMsgId = sendMessage(chatId, textBaru, keyboard);
+         if(botMsgId) CacheService.getScriptCache().put("LAST_MENU_" + chatId, String(botMsgId), 21600);
+     } else if (text === "📊 Informasi") {
+         var textBaru = "📊 *PUSAT INFORMASI*\nSilakan pilih modul informasi yang ingin dilihat:";
+         var keyboard = { inline_keyboard: [
+             [{"text": "📩 Undangan", "callback_data": "NAV_INFO_UNDANGAN"}],
+             [{"text": "🤝 Media Partner", "callback_data": "NAV_INFO_MEDPART"}],
+             [{"text": "💰 Sponsorship", "callback_data": "NAV_INFO_SPONSOR"}],
+             [{"text": "🔗 Partnership", "callback_data": "NAV_INFO_PARTNER"}],
+             [{"text": "🔙 Menu Utama", "callback_data": "MENU_KEMBALI"}]
+         ]};
+         var botMsgId = sendMessage(chatId, textBaru, keyboard);
+         if(botMsgId) CacheService.getScriptCache().put("LAST_MENU_" + chatId, String(botMsgId), 21600);
+     } else if (text === "🛠️ Admin") {
+         if (!dataUserVerif.isAdmin) return sendMessage(chatId, "❌ Maaf, kamu bukan Admin Grup PR UKBA. Akses ditolak! 💅");
+         var textBaru = "🛠️ *PANEL ADMIN*\nSilakan pilih menu khusus Admin:";
+         var keyboard = { inline_keyboard: [
+             [{"text": "🗑️ Hapus Data", "callback_data": "MENU_ADMIN_HAPUS"}, {"text": "📢 Broadcast", "callback_data": "MENU_ADMIN_BROADCAST"}],
+             [{"text": "🔙 Menu Utama", "callback_data": "MENU_KEMBALI"}]
+         ]};
+         var botMsgId = sendMessage(chatId, textBaru, keyboard);
+         if(botMsgId) CacheService.getScriptCache().put("LAST_MENU_" + chatId, String(botMsgId), 21600);
+     }
+     return;
+  }
+
 
   if (text === "/cekid") {
     sendMessage(chatId, "ID untuk chat ini adalah:\n`" + chatId + "`\n\nSilakan copy angka di atas dan masukkan persis seperti itu ke dalam nilai GRUP_CHAT_ID di Script Properties!");
@@ -2648,7 +2690,13 @@ function processWizardInput(chatId, userId, text, userMessageId, msg) {
          if (hasStringId) {
              if (dataAll[i][1] === idHapus) { 
                  found = true; 
-                 info = dataAll[i][3]; // Kolom index 3 (Instansi/Pengirim)
+                 if (modul === "UNDANGAN") {
+                     var wktRaw = dataAll[i][5];
+                     var wktFormat = (wktRaw instanceof Date) ? Utilities.formatDate(wktRaw, "Asia/Jakarta", "dd/MM/yyyy HH:mm") : String(wktRaw);
+                     info = dataAll[i][3] + " - " + dataAll[i][4] + "\nWaktu: " + wktFormat + "\nLokasi: " + dataAll[i][6];
+                 } else {
+                     info = dataAll[i][3]; // Medpart instansi
+                 }
                  break; 
              }
          } else {
