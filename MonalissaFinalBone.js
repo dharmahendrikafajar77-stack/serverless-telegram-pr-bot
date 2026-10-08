@@ -45,17 +45,33 @@ function formatTanggalInput(text) {
   var teksLower = String(text).trim().toLowerCase();
   if (teksLower === "tba" || teksLower === "❌ belum ada data") return text;
   
-  var match = text.match(/^(\d{1,2})[-/](\d{1,2})(?:[-/](\d{2,4}))?/);
+  var match = text.match(/^(\d{1,2})[-/\s]+([\w]+)(?:[-/\s]+(\d{2,4}))?/);
   if (match) {
       var tgl = String(match[1]).padStart(2, '0');
-      var bln = parseInt(match[2], 10);
+      var blnRaw = match[2].toLowerCase();
       var thn = match[3] || String(new Date().getFullYear());
       if (thn.length === 2) thn = "20" + thn;
       
       var namaBulanArr = ["Januari", "Februari", "Maret", "April", "Mei", "Juni", "Juli", "Agustus", "September", "Oktober", "November", "Desember"];
-      if (bln >= 1 && bln <= 12) {
+      var blnIndex = -1;
+      
+      if (!isNaN(parseInt(blnRaw, 10))) {
+         blnIndex = parseInt(blnRaw, 10) - 1;
+      } else {
+         for (var i = 0; i < namaBulanArr.length; i++) {
+            if (namaBulanArr[i].toLowerCase().indexOf(blnRaw) === 0) {
+               blnIndex = i;
+               break;
+            }
+         }
+      }
+      
+      if (blnIndex >= 0 && blnIndex <= 11) {
+          var tglObj = new Date(parseInt(thn), blnIndex, parseInt(tgl));
+          var namaHari = ["Minggu", "Senin", "Selasa", "Rabu", "Kamis", "Jumat", "Sabtu"][tglObj.getDay()];
+          
           var sisa = text.replace(match[0], "").trim();
-          var hasil = tgl + " " + namaBulanArr[bln - 1] + " " + thn;
+          var hasil = namaHari + ", " + tgl + " " + namaBulanArr[blnIndex] + " " + thn;
           if (sisa) hasil += " " + sisa;
           return hasil;
       }
