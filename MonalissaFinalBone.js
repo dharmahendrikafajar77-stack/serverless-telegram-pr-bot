@@ -2511,15 +2511,15 @@ function processWizardInput(chatId, userId, text, userMessageId, msg) {
 
      cache.remove("WIZ_STATE_" + userId);
      
-     var sheetSp = SpreadsheetApp.openById(sheetId).getSheetByName("Sponsorship");
+     var sheetSp = SpreadsheetApp.openById(sheetId).getSheetByName("Sponsorship") || SpreadsheetApp.openById(sheetId).getSheetByName("Sponsor");
      if (!sheetSp) {
-        kirimMenuUtama(chatId, "❌ Gagal: Tab 'Sponsorship' tidak ditemukan.");
+        kirimMenuUtama(chatId, "❌ Gagal: Tab 'Sponsorship' atau 'Sponsor' tidak ditemukan.");
         return true;
      }
      
-     var lastRowSp = sheetSp.getLastRow();
-     var nomorUrut = lastRowSp < 1 ? 1 : lastRowSp; 
-     sheetSp.appendRow([nomorUrut, smartTitleCase(instansi), tgl, syarat, benefit]);
+     var barisTujuan = sheetSp.getLastRow() + 1;
+     var nomorUrut = barisTujuan > 2 ? barisTujuan - 2 : 1; 
+     sheetSp.appendRow([nomorUrut, smartTitleCase(instansi), tgl, syarat, benefit, ""]);
      
      clearWizardMessages(chatId, userId);
      
@@ -2536,7 +2536,7 @@ function processWizardInput(chatId, userId, text, userMessageId, msg) {
   // =====================
   if (userState === "PT_INSTANSI") {
      cache.put("WIZ_PT_INSTANSI_" + userId, text, 600);
-     var botMsgId = sendMessage(chatId, "✅ Instansi: *" + text + "*\n\nApa saja *Persyaratan* dari partnership ini?");
+     var botMsgId = sendMessage(chatId, "✅ Instansi: *" + text + "*\n\nApa saja **Point of Agreement (PoA) UKBA**?\n_(Kewajiban/tugas dari pihak PR UKBA)_");
      trackMsg(userId, botMsgId);
      cache.put("WIZ_STATE_" + userId, "PT_SYARAT", 600);
      return true;
@@ -2544,7 +2544,7 @@ function processWizardInput(chatId, userId, text, userMessageId, msg) {
 
   if (userState === "PT_SYARAT") {
      cache.put("WIZ_PT_SYARAT_" + userId, text, 600);
-     var botMsgId = sendMessage(chatId, "✅ Persyaratan: *" + text + "*\n\nApa saja *Benefit* yang kita dapatkan?");
+     var botMsgId = sendMessage(chatId, "✅ PoA UKBA: *" + text + "*\n\nApa saja **Point of Agreement (PoA) EKSTERNAL**?\n_(Kewajiban/tugas dari pihak Partner)_");
      trackMsg(userId, botMsgId);
      cache.put("WIZ_STATE_" + userId, "PT_BENEFIT", 600);
      return true;
@@ -2552,7 +2552,7 @@ function processWizardInput(chatId, userId, text, userMessageId, msg) {
 
   if (userState === "PT_BENEFIT") {
      cache.put("WIZ_PT_BENEFIT_" + userId, text, 600);
-     var botMsgId = sendMessage(chatId, "✅ Benefit: *" + text + "*\n\nKapan *Tanggal Mulai* kerjasama ini?\n_(Misal: 10 Oktober 2026)_");
+     var botMsgId = sendMessage(chatId, "✅ PoA Eksternal: *" + text + "*\n\nKapan *Tanggal Mulai* kerjasama ini?\n_(Misal: 10 Oktober 2026)_");
      trackMsg(userId, botMsgId);
      cache.put("WIZ_STATE_" + userId, "PT_MULAI", 600);
      return true;
@@ -2575,19 +2575,19 @@ function processWizardInput(chatId, userId, text, userMessageId, msg) {
 
      cache.remove("WIZ_STATE_" + userId);
      
-     var sheetPt = SpreadsheetApp.openById(sheetId).getSheetByName("Partnership");
+     var sheetPt = SpreadsheetApp.openById(sheetId).getSheetByName("Partnership") || SpreadsheetApp.openById(sheetId).getSheetByName("Partner");
      if (!sheetPt) {
         kirimMenuUtama(chatId, "❌ Gagal: Tab 'Partnership' tidak ditemukan.");
         return true;
      }
      
-     var lastRowPt = sheetPt.getLastRow();
-     var nomorUrut = lastRowPt < 1 ? 1 : lastRowPt; 
-     sheetPt.appendRow([nomorUrut, smartTitleCase(instansi), syarat, benefit, mulai, selesai]);
+     var barisTujuan = sheetPt.getLastRow() + 1;
+     var nomorUrut = barisTujuan > 2 ? barisTujuan - 2 : 1;
+     sheetPt.appendRow([nomorUrut, smartTitleCase(instansi), syarat, benefit, mulai, selesai, ""]);
      
      clearWizardMessages(chatId, userId);
      
-     var balasan = "🔗 *PARTNERSHIP BARU TERCATAT!* 🔗\n\n*Instansi:* " + smartTitleCase(instansi) + "\n*Periode:* " + mulai + " - " + selesai + "\n*Syarat:* " + syarat + "\n*Benefit:* " + benefit;
+     var balasan = "🔗 *PARTNERSHIP BARU TERCATAT!* 🔗\n\n*Instansi:* " + smartTitleCase(instansi) + "\n*Periode:* " + mulai + " - " + selesai + "\n*PoA UKBA:* " + syarat + "\n*PoA Eksternal:* " + benefit;
      kirimMenuUtama(chatId, balasan);
      if (grupChatId && String(chatId) !== String(grupChatId)) {
        sendMessage(grupChatId, balasan);
