@@ -1431,6 +1431,28 @@ function handleCallback(callbackQuery) {
     return UrlFetchApp.fetch("https://api.telegram.org/bot" + token + "/answerCallbackQuery?callback_query_id=" + callbackQuery.id);
   }
 
+  if (action === "MENU_INPUT_SP") {
+    var textBaru = "Siyapp! Mari kita catat data Sponsorship. ✍️\n\nApa *Nama Instansi / Sponsor*?";
+    var keyboard = { "inline_keyboard": [[{"text": "🔙 Batal", "callback_data": "NAV_PEKERJAAN_SPONSOR"}]] };
+    UrlFetchApp.fetch("https://api.telegram.org/bot" + token + "/editMessageText", { method: "post", contentType: "application/json", payload: JSON.stringify({ chat_id: String(chatId), message_id: messageId, text: textBaru, parse_mode: "Markdown", reply_markup: keyboard }), muteHttpExceptions: true });
+    
+    var cache = CacheService.getScriptCache();
+    cache.put("WIZ_STATE_" + userIdCallback, "SP_INSTANSI", 600);
+    trackMsg(userIdCallback, messageId);
+    return UrlFetchApp.fetch("https://api.telegram.org/bot" + token + "/answerCallbackQuery?callback_query_id=" + callbackQuery.id);
+  }
+
+  if (action === "MENU_INPUT_PT") {
+    var textBaru = "Siyapp! Mari kita catat data Partnership. ✍️\n\nApa *Nama Instansi / Partner*?";
+    var keyboard = { "inline_keyboard": [[{"text": "🔙 Batal", "callback_data": "NAV_PEKERJAAN_PARTNER"}]] };
+    UrlFetchApp.fetch("https://api.telegram.org/bot" + token + "/editMessageText", { method: "post", contentType: "application/json", payload: JSON.stringify({ chat_id: String(chatId), message_id: messageId, text: textBaru, parse_mode: "Markdown", reply_markup: keyboard }), muteHttpExceptions: true });
+    
+    var cache = CacheService.getScriptCache();
+    cache.put("WIZ_STATE_" + userIdCallback, "PT_INSTANSI", 600);
+    trackMsg(userIdCallback, messageId);
+    return UrlFetchApp.fetch("https://api.telegram.org/bot" + token + "/answerCallbackQuery?callback_query_id=" + callbackQuery.id);
+  }
+
   if (action === "MENU_CEK_JADWAL") {
     var textBaru = "📆 *PILIH BULAN REKAP*\nSilakan pilih bulan untuk melihat rekap undangan:";
     var keyboard = { "inline_keyboard": [
@@ -1736,15 +1758,21 @@ function handleCallback(callbackQuery) {
   }
 
   if (action === "NAV_PEKERJAAN_SPONSOR") {
-     var textBaru = "💰 *MODUL SPONSORSHIP*\n\nUntuk mencatat data Sponsorship, silakan kirimkan pesan baru ke Monalissa dengan format formulir berikut:\n\n`/sp`\n`Instansi: `\n`Tanggal: `\n`Persyaratan: `\n`Benefit: `";
-     var keyboard = { inline_keyboard: [[{"text": "🔙 Kembali", "callback_data": "NAV_PEKERJAAN"}]]};
+     var textBaru = "💰 *MODUL SPONSORSHIP*\nSilakan pilih menu di bawah ini:";
+     var keyboard = { inline_keyboard: [
+         [{"text": "📝 Input SP Baru", "callback_data": "MENU_INPUT_SP"}],
+         [{"text": "🔙 Kembali", "callback_data": "NAV_PEKERJAAN"}]
+     ]};
      UrlFetchApp.fetch("https://api.telegram.org/bot" + token + "/editMessageText", { method: "post", contentType: "application/json", payload: JSON.stringify({ chat_id: String(chatId), message_id: messageId, text: textBaru, parse_mode: "Markdown", reply_markup: keyboard }), muteHttpExceptions: true });
      return UrlFetchApp.fetch("https://api.telegram.org/bot" + token + "/answerCallbackQuery?callback_query_id=" + callbackQuery.id);
   }
 
   if (action === "NAV_PEKERJAAN_PARTNER") {
-     var textBaru = "🔗 *MODUL PARTNERSHIP*\n\nUntuk mencatat data Partnership, silakan kirimkan pesan baru ke Monalissa dengan format formulir berikut:\n\n`/pt`\n`Instansi: `\n`Persyaratan: `\n`Benefit: `\n`Mulai: `\n`Selesai: `";
-     var keyboard = { inline_keyboard: [[{"text": "🔙 Kembali", "callback_data": "NAV_PEKERJAAN"}]]};
+     var textBaru = "🔗 *MODUL PARTNERSHIP*\nSilakan pilih menu di bawah ini:";
+     var keyboard = { inline_keyboard: [
+         [{"text": "📝 Input Partner Baru", "callback_data": "MENU_INPUT_PT"}],
+         [{"text": "🔙 Kembali", "callback_data": "NAV_PEKERJAAN"}]
+     ]};
      UrlFetchApp.fetch("https://api.telegram.org/bot" + token + "/editMessageText", { method: "post", contentType: "application/json", payload: JSON.stringify({ chat_id: String(chatId), message_id: messageId, text: textBaru, parse_mode: "Markdown", reply_markup: keyboard }), muteHttpExceptions: true });
      return UrlFetchApp.fetch("https://api.telegram.org/bot" + token + "/answerCallbackQuery?callback_query_id=" + callbackQuery.id);
   }
@@ -2275,6 +2303,17 @@ function processWizardInput(chatId, userId, text, userMessageId, msg) {
       cache.remove("WIZ_TGLBLN_" + userId);
       cache.remove("WIZ_JAM_" + userId);
       
+      // Cleanup cache SP
+      cache.remove("WIZ_SP_INSTANSI_" + userId);
+      cache.remove("WIZ_SP_TGL_" + userId);
+      cache.remove("WIZ_SP_SYARAT_" + userId);
+      
+      // Cleanup cache PT
+      cache.remove("WIZ_PT_INSTANSI_" + userId);
+      cache.remove("WIZ_PT_SYARAT_" + userId);
+      cache.remove("WIZ_PT_BENEFIT_" + userId);
+      cache.remove("WIZ_PT_MULAI_" + userId);
+      
       trackMsg(userId, userMessageId);
       clearWizardMessages(chatId, userId);
       
@@ -2427,6 +2466,128 @@ function processWizardInput(chatId, userId, text, userMessageId, msg) {
      clearWizardMessages(chatId, userId);
      
      var balasan = "🤝 *MEDPART BARU TERCATAT!* 🤝\n_(via Menu Interaktif 🍀)_\n\n*ID:* " + idSurat + "\n*Instansi:* " + instansi + "\n*Tanggal Upload:* " + tglUpload + "\n*Bukti/Link:* " + bukti;
+     kirimMenuUtama(chatId, balasan);
+     if (grupChatId && String(chatId) !== String(grupChatId)) {
+       sendMessage(grupChatId, balasan);
+     }
+     return true;
+  }
+
+      return true;
+  }
+
+  // =====================
+  // TAHAP INPUT SPONSORSHIP
+  // =====================
+  if (userState === "SP_INSTANSI") {
+     cache.put("WIZ_SP_INSTANSI_" + userId, text, 600);
+     var botMsgId = sendMessage(chatId, "✅ Instansi: *" + text + "*\n\nKapan *Tanggal/Waktu* pelaksanaannya?\n_(Ketik 'TBA' jika belum pasti)_");
+     trackMsg(userId, botMsgId);
+     cache.put("WIZ_STATE_" + userId, "SP_TGL", 600);
+     return true;
+  }
+
+  if (userState === "SP_TGL") {
+     cache.put("WIZ_SP_TGL_" + userId, text, 600);
+     var botMsgId = sendMessage(chatId, "✅ Tanggal: *" + text + "*\n\nApa saja *Persyaratan* dari sponsor tersebut?");
+     trackMsg(userId, botMsgId);
+     cache.put("WIZ_STATE_" + userId, "SP_SYARAT", 600);
+     return true;
+  }
+
+  if (userState === "SP_SYARAT") {
+     cache.put("WIZ_SP_SYARAT_" + userId, text, 600);
+     var botMsgId = sendMessage(chatId, "✅ Persyaratan: *" + text + "*\n\nTerakhir, apa saja *Benefit* yang kita dapatkan?");
+     trackMsg(userId, botMsgId);
+     cache.put("WIZ_STATE_" + userId, "SP_BENEFIT", 600);
+     return true;
+  }
+
+  if (userState === "SP_BENEFIT") {
+     var instansi = cache.get("WIZ_SP_INSTANSI_" + userId) || "";
+     var tgl = cache.get("WIZ_SP_TGL_" + userId) || "";
+     var syarat = cache.get("WIZ_SP_SYARAT_" + userId) || "";
+     var benefit = text;
+
+     cache.remove("WIZ_STATE_" + userId);
+     
+     var sheetSp = SpreadsheetApp.openById(sheetId).getSheetByName("Sponsorship");
+     if (!sheetSp) {
+        kirimMenuUtama(chatId, "❌ Gagal: Tab 'Sponsorship' tidak ditemukan.");
+        return true;
+     }
+     
+     var lastRowSp = sheetSp.getLastRow();
+     var nomorUrut = lastRowSp < 1 ? 1 : lastRowSp; 
+     sheetSp.appendRow([nomorUrut, smartTitleCase(instansi), tgl, syarat, benefit]);
+     
+     clearWizardMessages(chatId, userId);
+     
+     var balasan = "💰 *SPONSORSHIP BARU TERCATAT!* 💰\n\n*Instansi:* " + smartTitleCase(instansi) + "\n*Tanggal:* " + tgl + "\n*Syarat:* " + syarat + "\n*Benefit:* " + benefit;
+     kirimMenuUtama(chatId, balasan);
+     if (grupChatId && String(chatId) !== String(grupChatId)) {
+       sendMessage(grupChatId, balasan);
+     }
+     return true;
+  }
+
+  // =====================
+  // TAHAP INPUT PARTNERSHIP
+  // =====================
+  if (userState === "PT_INSTANSI") {
+     cache.put("WIZ_PT_INSTANSI_" + userId, text, 600);
+     var botMsgId = sendMessage(chatId, "✅ Instansi: *" + text + "*\n\nApa saja *Persyaratan* dari partnership ini?");
+     trackMsg(userId, botMsgId);
+     cache.put("WIZ_STATE_" + userId, "PT_SYARAT", 600);
+     return true;
+  }
+
+  if (userState === "PT_SYARAT") {
+     cache.put("WIZ_PT_SYARAT_" + userId, text, 600);
+     var botMsgId = sendMessage(chatId, "✅ Persyaratan: *" + text + "*\n\nApa saja *Benefit* yang kita dapatkan?");
+     trackMsg(userId, botMsgId);
+     cache.put("WIZ_STATE_" + userId, "PT_BENEFIT", 600);
+     return true;
+  }
+
+  if (userState === "PT_BENEFIT") {
+     cache.put("WIZ_PT_BENEFIT_" + userId, text, 600);
+     var botMsgId = sendMessage(chatId, "✅ Benefit: *" + text + "*\n\nKapan *Tanggal Mulai* kerjasama ini?\n_(Misal: 10 Oktober 2026)_");
+     trackMsg(userId, botMsgId);
+     cache.put("WIZ_STATE_" + userId, "PT_MULAI", 600);
+     return true;
+  }
+
+  if (userState === "PT_MULAI") {
+     cache.put("WIZ_PT_MULAI_" + userId, text, 600);
+     var botMsgId = sendMessage(chatId, "✅ Tanggal Mulai: *" + text + "*\n\nDan kapan *Tanggal Selesai* kerjasama ini?");
+     trackMsg(userId, botMsgId);
+     cache.put("WIZ_STATE_" + userId, "PT_SELESAI", 600);
+     return true;
+  }
+
+  if (userState === "PT_SELESAI") {
+     var instansi = cache.get("WIZ_PT_INSTANSI_" + userId) || "";
+     var syarat = cache.get("WIZ_PT_SYARAT_" + userId) || "";
+     var benefit = cache.get("WIZ_PT_BENEFIT_" + userId) || "";
+     var mulai = cache.get("WIZ_PT_MULAI_" + userId) || "";
+     var selesai = text;
+
+     cache.remove("WIZ_STATE_" + userId);
+     
+     var sheetPt = SpreadsheetApp.openById(sheetId).getSheetByName("Partnership");
+     if (!sheetPt) {
+        kirimMenuUtama(chatId, "❌ Gagal: Tab 'Partnership' tidak ditemukan.");
+        return true;
+     }
+     
+     var lastRowPt = sheetPt.getLastRow();
+     var nomorUrut = lastRowPt < 1 ? 1 : lastRowPt; 
+     sheetPt.appendRow([nomorUrut, smartTitleCase(instansi), syarat, benefit, mulai, selesai]);
+     
+     clearWizardMessages(chatId, userId);
+     
+     var balasan = "🔗 *PARTNERSHIP BARU TERCATAT!* 🔗\n\n*Instansi:* " + smartTitleCase(instansi) + "\n*Periode:* " + mulai + " - " + selesai + "\n*Syarat:* " + syarat + "\n*Benefit:* " + benefit;
      kirimMenuUtama(chatId, balasan);
      if (grupChatId && String(chatId) !== String(grupChatId)) {
        sendMessage(grupChatId, balasan);
