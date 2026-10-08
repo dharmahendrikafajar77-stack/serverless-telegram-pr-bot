@@ -41,7 +41,7 @@ function formatBulletPoints(text) {
   return hasil.join("\n");
 }
 
-function simpanFileKeDrive(fileIdTelegram) {
+function simpanFileKeDrive(fileIdTelegram, subFolderName) {
   try {
       var fileDataUrl = "https://api.telegram.org/bot" + token + "/getFile?file_id=" + fileIdTelegram;
       var response = UrlFetchApp.fetch(fileDataUrl);
@@ -52,8 +52,20 @@ function simpanFileKeDrive(fileIdTelegram) {
       var downloadUrl = "https://api.telegram.org/file/bot" + token + "/" + filePath;
       var blob = UrlFetchApp.fetch(downloadUrl).getBlob();
       
-      var folder = DriveApp.getFolderById(folderId);
-      var savedFile = folder.createFile(blob);
+      var mainFolder = DriveApp.getFolderById(folderId);
+      var folderTujuan = mainFolder;
+      
+      // Jika ada nama subfolder, cari atau buat otomatis
+      if (subFolderName) {
+          var folderIter = mainFolder.getFoldersByName(subFolderName);
+          if (folderIter.hasNext()) {
+              folderTujuan = folderIter.next();
+          } else {
+              folderTujuan = mainFolder.createFolder(subFolderName);
+          }
+      }
+      
+      var savedFile = folderTujuan.createFile(blob);
       savedFile.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
       
       return "https://drive.google.com/uc?export=view&id=" + savedFile.getId();
@@ -2482,13 +2494,13 @@ function processWizardInput(chatId, userId, text, userMessageId, msg) {
      var fileLink = text;
      if (msg && msg.document) {
          var fileId = msg.document.file_id;
-         sendMessage(chatId, "⏳ Mengunggah Dokumen Bukti ke GDrive...");
-         var urlDrive = simpanFileKeDrive(fileId);
+         sendMessage(chatId, "⏳ Mengunggah Dokumen Bukti ke GDrive (Folder: Medpart)...");
+         var urlDrive = simpanFileKeDrive(fileId, "Medpart");
          if (urlDrive) fileLink = urlDrive;
      } else if (msg && msg.photo && msg.photo.length > 0) {
          var fileId = msg.photo[msg.photo.length - 1].file_id;
-         sendMessage(chatId, "⏳ Mengunggah Foto Bukti ke GDrive...");
-         var urlDrive = simpanFileKeDrive(fileId);
+         sendMessage(chatId, "⏳ Mengunggah Foto Bukti ke GDrive (Folder: Medpart)...");
+         var urlDrive = simpanFileKeDrive(fileId, "Medpart");
          if (urlDrive) fileLink = urlDrive;
      }
 
@@ -2563,23 +2575,23 @@ function processWizardInput(chatId, userId, text, userMessageId, msg) {
   if (userState === "SP_BENEFIT") {
      var formattedBenefit = formatBulletPoints(text);
      cache.put("WIZ_SP_BENEFIT_" + userId, formattedBenefit, 600);
-     var botMsgId = sendMessage(chatId, "✅ Benefit:\n" + formattedBenefit + "\n\nTerakhir, kirimkan **Dokumen MoU** (File PDF, Foto, atau Link).\n_(Ketik 'TBA' jika MoU belum ada)_");
+     var botMsgId = sendMessage(chatId, "✅ Benefit:\n" + formattedBenefit + "\n\nTerakhir, kirimkan **Dokumen MoU**.\n_(Harap kirim dalam bentuk File PDF/Word, ketik 'TBA' jika MoU belum ada)_");
      trackMsg(userId, botMsgId);
      cache.put("WIZ_STATE_" + userId, "SP_MOU", 600);
      return true;
   }
 
   if (userState === "SP_MOU") {
+     if (msg && msg.photo && msg.photo.length > 0) {
+         sendMessage(chatId, "❌ Maaf, untuk MoU harap kirimkan dalam bentuk **File Dokumen (PDF/Word)**, bukan Gambar/Foto biasa.\n\nSilakan konversi dulu ke PDF dan kirimkan ulang file-nya di sini!");
+         return true; // Jangan hapus state, tunggu dia kirim ulang
+     }
+
      var fileLink = text;
      if (msg && msg.document) {
          var fileId = msg.document.file_id;
-         sendMessage(chatId, "⏳ Mengunggah Dokumen MoU ke GDrive...");
-         var urlDrive = simpanFileKeDrive(fileId);
-         if (urlDrive) fileLink = urlDrive;
-     } else if (msg && msg.photo && msg.photo.length > 0) {
-         var fileId = msg.photo[msg.photo.length - 1].file_id;
-         sendMessage(chatId, "⏳ Mengunggah Foto MoU ke GDrive...");
-         var urlDrive = simpanFileKeDrive(fileId);
+         sendMessage(chatId, "⏳ Mengunggah Dokumen MoU ke GDrive (Folder: Sponsorship)...");
+         var urlDrive = simpanFileKeDrive(fileId, "Sponsorship");
          if (urlDrive) fileLink = urlDrive;
      }
 
@@ -2650,23 +2662,23 @@ function processWizardInput(chatId, userId, text, userMessageId, msg) {
 
   if (userState === "PT_SELESAI") {
      cache.put("WIZ_PT_SELESAI_" + userId, text, 600);
-     var botMsgId = sendMessage(chatId, "✅ Tanggal Selesai: *" + text + "*\n\nTerakhir, kirimkan **Dokumen MoU** (File PDF, Foto, atau Link).\n_(Ketik 'TBA' jika MoU belum ada)_");
+     var botMsgId = sendMessage(chatId, "✅ Tanggal Selesai: *" + text + "*\n\nTerakhir, kirimkan **Dokumen MoU**.\n_(Harap kirim dalam bentuk File PDF/Word, ketik 'TBA' jika MoU belum ada)_");
      trackMsg(userId, botMsgId);
      cache.put("WIZ_STATE_" + userId, "PT_MOU", 600);
      return true;
   }
 
   if (userState === "PT_MOU") {
+     if (msg && msg.photo && msg.photo.length > 0) {
+         sendMessage(chatId, "❌ Maaf, untuk MoU harap kirimkan dalam bentuk **File Dokumen (PDF/Word)**, bukan Gambar/Foto biasa.\n\nSilakan konversi dulu ke PDF dan kirimkan ulang file-nya di sini!");
+         return true; // Jangan hapus state, tunggu dia kirim ulang
+     }
+
      var fileLink = text;
      if (msg && msg.document) {
          var fileId = msg.document.file_id;
-         sendMessage(chatId, "⏳ Mengunggah Dokumen MoU ke GDrive...");
-         var urlDrive = simpanFileKeDrive(fileId);
-         if (urlDrive) fileLink = urlDrive;
-     } else if (msg && msg.photo && msg.photo.length > 0) {
-         var fileId = msg.photo[msg.photo.length - 1].file_id;
-         sendMessage(chatId, "⏳ Mengunggah Foto MoU ke GDrive...");
-         var urlDrive = simpanFileKeDrive(fileId);
+         sendMessage(chatId, "⏳ Mengunggah Dokumen MoU ke GDrive (Folder: Partnership)...");
+         var urlDrive = simpanFileKeDrive(fileId, "Partnership");
          if (urlDrive) fileLink = urlDrive;
      }
 
