@@ -1560,6 +1560,89 @@ function handleCallback(callbackQuery) {
      return UrlFetchApp.fetch("https://api.telegram.org/bot" + token + "/answerCallbackQuery?callback_query_id=" + callbackQuery.id);
   }
 
+  if (action === "MENU_ADMIN_HAPUS") {
+     var textBaru = "🗑️ *HAPUS DATA (ADMIN)*\n\nSilakan pilih modul mana yang datanya ingin dihapus permanen:";
+     var keyboard = { inline_keyboard: [
+         [{"text": "📩 Undangan", "callback_data": "ADMIN_HAPUS|UNDANGAN"}, {"text": "🤝 Media Partner", "callback_data": "ADMIN_HAPUS|MEDPART"}],
+         [{"text": "💰 Sponsorship", "callback_data": "ADMIN_HAPUS|SPONSOR"}, {"text": "🔗 Partnership", "callback_data": "ADMIN_HAPUS|PARTNER"}],
+         [{"text": "🔙 Kembali", "callback_data": "NAV_ADMIN"}]
+     ]};
+     UrlFetchApp.fetch("https://api.telegram.org/bot" + token + "/editMessageText", { method: "post", contentType: "application/json", payload: JSON.stringify({ chat_id: String(chatId), message_id: messageId, text: textBaru, parse_mode: "Markdown", reply_markup: keyboard }), muteHttpExceptions: true });
+     return UrlFetchApp.fetch("https://api.telegram.org/bot" + token + "/answerCallbackQuery?callback_query_id=" + callbackQuery.id);
+  }
+
+  if (action === "ADMIN_HAPUS") {
+     var modul = parts[1];
+     var contoh = "U01, M05";
+     if (modul === "SPONSOR" || modul === "PARTNER") contoh = "1, 2, 3 (Nomor Urut)";
+     
+     var textBaru = "🗑️ *HAPUS DATA " + modul + "*\n\nSilakan ketik *ID Data* yang ingin dihapus.\n_(Misalnya: " + contoh + ")_";
+     var keyboard = { inline_keyboard: [[{"text": "🔙 Batal", "callback_data": "MENU_ADMIN_HAPUS"}]] };
+     
+     UrlFetchApp.fetch("https://api.telegram.org/bot" + token + "/editMessageText", { method: "post", contentType: "application/json", payload: JSON.stringify({ chat_id: String(chatId), message_id: messageId, text: textBaru, parse_mode: "Markdown", reply_markup: keyboard }), muteHttpExceptions: true });
+     
+     var cache = CacheService.getScriptCache();
+     cache.put("WIZ_STATE_" + userIdCallback, "WIZ_ADMIN_HAPUS|" + modul, 600);
+     trackMsg(userIdCallback, messageId);
+     return UrlFetchApp.fetch("https://api.telegram.org/bot" + token + "/answerCallbackQuery?callback_query_id=" + callbackQuery.id);
+  }
+  
+  if (action === "CONFIRM_HAPUS") {
+      var modul = parts[1];
+      var idHapus = parts[2];
+      
+      var namaSheet = "";
+      var headerRows = 0;
+      var hasStringId = false;
+      var prefix = "";
+      
+      if (modul === "UNDANGAN") { namaSheet = "Undangan"; headerRows = 2; hasStringId = true; prefix = "U"; }
+      else if (modul === "MEDPART") { namaSheet = "Medpart"; headerRows = 1; hasStringId = true; prefix = "M"; }
+      else if (modul === "SPONSOR") { namaSheet = "Sponsorship"; headerRows = 1; } 
+      else if (modul === "PARTNER") { namaSheet = "Partnership"; headerRows = 1; }
+      
+      var sheet = SpreadsheetApp.openById(sheetId).getSheetByName(namaSheet);
+      if (!sheet && modul === "MEDPART") sheet = SpreadsheetApp.openById(sheetId).getSheetByName("Media Partner");
+      
+      if (!sheet) {
+          UrlFetchApp.fetch("https://api.telegram.org/bot" + token + "/editMessageText", { method: "post", contentType: "application/json", payload: JSON.stringify({ chat_id: String(chatId), message_id: messageId, text: "❌ Sheet " + modul + " tidak ditemukan." }), muteHttpExceptions: true });
+          return UrlFetchApp.fetch("https://api.telegram.org/bot" + token + "/answerCallbackQuery?callback_query_id=" + callbackQuery.id);
+      }
+      
+      var dataAll = sheet.getDataRange().getValues();
+      var barisDitemukan = -1;
+      
+      for (var i = headerRows; i < dataAll.length; i++) {
+         if (hasStringId) {
+             if (dataAll[i][1] === idHapus) { barisDitemukan = i + 1; break; }
+         } else {
+             if (String(dataAll[i][0]) === String(idHapus)) { barisDitemukan = i + 1; break; }
+         }
+      }
+      
+      if (barisDitemukan !== -1) {
+         sheet.deleteRow(barisDitemukan);
+         var lastRow = sheet.getLastRow();
+         var numRows = lastRow - headerRows; 
+         if (numRows > 0) {
+            var newNumbers = [];
+            var newIDs = [];
+            for (var r = 1; r <= numRows; r++) {
+               newNumbers.push([r]);
+               if (hasStringId) newIDs.push([prefix + String(r).padStart(2, '0')]);
+            }
+            sheet.getRange(headerRows + 1, 1, numRows, 1).setValues(newNumbers);
+            if (hasStringId) sheet.getRange(headerRows + 1, 2, numRows, 1).setValues(newIDs);
+         }
+         var textSukses = "✅ Data *" + modul + "* (" + idHapus + ") berhasil dihapus secara permanen dan penomoran (NO) telah dirapikan kembali. 💅";
+         UrlFetchApp.fetch("https://api.telegram.org/bot" + token + "/editMessageText", { method: "post", contentType: "application/json", payload: JSON.stringify({ chat_id: String(chatId), message_id: messageId, text: textSukses, parse_mode: "Markdown" }), muteHttpExceptions: true });
+      } else {
+         var textGagal = "❌ ID *" + idHapus + "* tidak ditemukan di database " + modul + ".";
+         UrlFetchApp.fetch("https://api.telegram.org/bot" + token + "/editMessageText", { method: "post", contentType: "application/json", payload: JSON.stringify({ chat_id: String(chatId), message_id: messageId, text: textGagal, parse_mode: "Markdown" }), muteHttpExceptions: true });
+      }
+      return UrlFetchApp.fetch("https://api.telegram.org/bot" + token + "/answerCallbackQuery?callback_query_id=" + callbackQuery.id);
+  }
+
   // --- NAVIGASI LEVEL 2 (PEKERJAAN) ---
   if (action === "NAV_PEKERJAAN_UNDANGAN") {
      var textBaru = "📩 *MODUL UNDANGAN*\nSilakan pilih fitur yang ingin digunakan:";
@@ -2528,6 +2611,75 @@ function processWizardInput(chatId, userId, text, userMessageId, msg) {
       }
       
       return true;
+  }
+
+  if (userState.startsWith("WIZ_ADMIN_HAPUS|")) {
+     var modul = userState.split("|")[1];
+     var idHapusRaw = text.trim().toUpperCase();
+     var idHapus = idHapusRaw;
+     
+     var hasStringId = false;
+     var namaSheet = "";
+     if (modul === "UNDANGAN") { namaSheet = "Undangan"; hasStringId = true; }
+     else if (modul === "MEDPART") { namaSheet = "Medpart"; hasStringId = true; }
+     else if (modul === "SPONSOR") { namaSheet = "Sponsorship"; }
+     else if (modul === "PARTNER") { namaSheet = "Partnership"; }
+     
+     if (hasStringId) {
+         if (modul === "UNDANGAN" && !idHapus.startsWith("U")) idHapus = "U" + idHapus.padStart(2, '0');
+         else if (modul === "MEDPART" && !idHapus.startsWith("M")) idHapus = "M" + idHapus.padStart(2, '0');
+     } else {
+         idHapus = idHapus.replace(/[^0-9]/g, "");
+     }
+     
+     var checkSheet = SpreadsheetApp.openById(sheetId).getSheetByName(namaSheet);
+     if(!checkSheet && modul === "MEDPART") checkSheet = SpreadsheetApp.openById(sheetId).getSheetByName("Media Partner");
+     
+     if (!checkSheet) {
+         var errId = sendMessage(chatId, "❌ Modul " + modul + " belum didukung (Sheet tidak ditemukan).");
+         trackMsg(userId, errId);
+         return true;
+     }
+     
+     var dataAll = checkSheet.getDataRange().getValues();
+     var found = false;
+     var info = "";
+     for (var i = 0; i < dataAll.length; i++) {
+         if (hasStringId) {
+             if (dataAll[i][1] === idHapus) { 
+                 found = true; 
+                 info = dataAll[i][3]; // Kolom index 3 (Instansi/Pengirim)
+                 break; 
+             }
+         } else {
+             if (String(dataAll[i][0]) === String(idHapus)) { 
+                 found = true; 
+                 info = dataAll[i][1]; // Kolom index 1 (Instansi)
+                 break; 
+             }
+         }
+     }
+     
+     if (!found) {
+         var errId = sendMessage(chatId, "❌ Gagal: ID *" + idHapus + "* tidak ditemukan di database " + modul + ".\nKetik ID lain atau ketik `/batal`.");
+         trackMsg(userId, errId);
+         return true;
+     }
+     
+     cache.remove("WIZ_STATE_" + userId);
+     trackMsg(userId, userMessageId);
+     
+     var textBaru = "⚠️ *PERINGATAN MENGHAPUS DATA*\n\nKamu akan menghapus data " + modul + " secara permanen:\n*ID Data:* " + idHapus + "\n*Info:* " + info + "\n\n🚨 _Data yang sudah dihapus tidak akan bisa dipulihkan kembali dan penomoran akan dirapikan ulang!_\n\n*Apakah kamu yakin ingin menghapus data ini?*";
+     var keyboard = { inline_keyboard: [
+         [{"text": "✅ Ya, Hapus Permanen", "callback_data": "CONFIRM_HAPUS|" + modul + "|" + idHapus}],
+         [{"text": "❌ Tidak, Batalkan", "callback_data": "MENU_ADMIN_HAPUS"}]
+     ]};
+     
+     clearWizardMessages(chatId, userId);
+     var botMsgId = sendMessage(chatId, textBaru, keyboard);
+     if (botMsgId) cache.put("LAST_MENU_" + chatId, String(botMsgId), 21600);
+     
+     return true;
   }
 
   return false; // State tidak dikenali
