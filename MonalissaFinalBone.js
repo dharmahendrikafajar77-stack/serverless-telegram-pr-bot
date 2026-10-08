@@ -41,6 +41,29 @@ function formatBulletPoints(text) {
   return hasil.join("\n");
 }
 
+function formatTanggalInput(text) {
+  var teksLower = String(text).trim().toLowerCase();
+  if (teksLower === "tba" || teksLower === "❌ belum ada data") return text;
+  
+  var match = text.match(/^(\d{1,2})[-/](\d{1,2})(?:[-/](\d{2,4}))?/);
+  if (match) {
+      var tgl = String(match[1]).padStart(2, '0');
+      var bln = parseInt(match[2], 10);
+      var thn = match[3] || String(new Date().getFullYear());
+      if (thn.length === 2) thn = "20" + thn;
+      
+      var namaBulanArr = ["Januari", "Februari", "Maret", "April", "Mei", "Juni", "Juli", "Agustus", "September", "Oktober", "November", "Desember"];
+      if (bln >= 1 && bln <= 12) {
+          var sisa = text.replace(match[0], "").trim();
+          var hasil = tgl + " " + namaBulanArr[bln - 1] + " " + thn;
+          if (sisa) hasil += " " + sisa;
+          return hasil;
+      }
+  }
+  
+  return smartTitleCase(text);
+}
+
 function simpanFileKeDrive(fileIdTelegram, subFolderName) {
   try {
       var fileDataUrl = "https://api.telegram.org/bot" + token + "/getFile?file_id=" + fileIdTelegram;
@@ -2488,16 +2511,18 @@ function processWizardInput(chatId, userId, text, userMessageId, msg) {
   // TAHAP INPUT MEDPART
   // =====================
   if (userState === "MEDPART_INSTANSI") {
-     cache.put("WIZ_MP_INSTANSI_" + userId, text, 600);
-     var botMsgId = sendMessage(chatId, "✅ Instansi: *" + text + "*\n\nKapan *Tanggal Upload* poster yang diinginkan?");
+     var instansi = smartTitleCase(text);
+     cache.put("WIZ_MP_INSTANSI_" + userId, instansi, 600);
+     var botMsgId = sendMessage(chatId, "✅ Instansi: *" + instansi + "*\n\nKapan *Tanggal Upload* poster yang diinginkan?\n_(Contoh: 12/12 atau 12 Desember 2026)_");
      trackMsg(userId, botMsgId);
      cache.put("WIZ_STATE_" + userId, "MEDPART_TGL", 600);
      return true;
   }
   
   if (userState === "MEDPART_TGL") {
-     cache.put("WIZ_MP_TGL_" + userId, text, 600);
-     var botMsgId = sendMessage(chatId, "✅ Tanggal: *" + text + "*\n\nTerakhir, kirimkan *Link GDrive* atau *Bukti Foto* bahwa syarat Medpart sudah terpenuhi!", 
+     var formattedTgl = formatTanggalInput(text);
+     cache.put("WIZ_MP_TGL_" + userId, formattedTgl, 600);
+     var botMsgId = sendMessage(chatId, "✅ Tanggal: *" + formattedTgl + "*\n\nTerakhir, kirimkan *Link GDrive* atau *Bukti Foto* bahwa syarat Medpart sudah terpenuhi!", 
          { inline_keyboard: [[{ text: "⏩ Lewati (Data Belum Ada)", callback_data: "WIZ_SKIP_INPUT" }]] }
      );
      trackMsg(userId, botMsgId);
@@ -2561,8 +2586,9 @@ function processWizardInput(chatId, userId, text, userMessageId, msg) {
   // TAHAP INPUT SPONSORSHIP
   // =====================
   if (userState === "SP_INSTANSI") {
-     cache.put("WIZ_SP_INSTANSI_" + userId, text, 600);
-     var botMsgId = sendMessage(chatId, "✅ Instansi: *" + text + "*\n\nKapan *Tanggal/Waktu* pelaksanaannya?\n_(Contoh: 12 Desember 2026)_",
+     var instansi = smartTitleCase(text);
+     cache.put("WIZ_SP_INSTANSI_" + userId, instansi, 600);
+     var botMsgId = sendMessage(chatId, "✅ Instansi: *" + instansi + "*\n\nKapan *Tanggal/Waktu* pelaksanaannya?\n_(Contoh: 12/12 atau 12 Desember 2026)_",
          { inline_keyboard: [[{ text: "⏩ Lewati (Belum Pasti)", callback_data: "WIZ_SKIP_INPUT" }]] }
      );
      trackMsg(userId, botMsgId);
@@ -2571,8 +2597,9 @@ function processWizardInput(chatId, userId, text, userMessageId, msg) {
   }
 
   if (userState === "SP_TGL") {
-     cache.put("WIZ_SP_TGL_" + userId, text, 600);
-     var botMsgId = sendMessage(chatId, "✅ Tanggal: *" + text + "*\n\nApa saja *Persyaratan* dari sponsor tersebut?\n_(Gunakan baris baru (Enter) untuk memisah antar poin)_");
+     var formattedTgl = formatTanggalInput(text);
+     cache.put("WIZ_SP_TGL_" + userId, formattedTgl, 600);
+     var botMsgId = sendMessage(chatId, "✅ Tanggal: *" + formattedTgl + "*\n\nApa saja *Persyaratan* dari sponsor tersebut?\n_(Gunakan baris baru (Enter) untuk memisah antar poin)_");
      trackMsg(userId, botMsgId);
      cache.put("WIZ_STATE_" + userId, "SP_SYARAT", 600);
      return true;
@@ -2644,8 +2671,9 @@ function processWizardInput(chatId, userId, text, userMessageId, msg) {
   // TAHAP INPUT PARTNERSHIP
   // =====================
   if (userState === "PT_INSTANSI") {
-     cache.put("WIZ_PT_INSTANSI_" + userId, text, 600);
-     var botMsgId = sendMessage(chatId, "✅ Instansi: *" + text + "*\n\nApa saja **Point of Agreement (PoA) UKBA**?\n_(Kewajiban pihak PR UKBA, gunakan Enter untuk memisah poin)_");
+     var instansi = smartTitleCase(text);
+     cache.put("WIZ_PT_INSTANSI_" + userId, instansi, 600);
+     var botMsgId = sendMessage(chatId, "✅ Instansi: *" + instansi + "*\n\nApa saja **Point of Agreement (PoA) UKBA**?\n_(Kewajiban pihak PR UKBA, gunakan Enter untuk memisah poin)_");
      trackMsg(userId, botMsgId);
      cache.put("WIZ_STATE_" + userId, "PT_SYARAT", 600);
      return true;
@@ -2663,23 +2691,25 @@ function processWizardInput(chatId, userId, text, userMessageId, msg) {
   if (userState === "PT_BENEFIT") {
      var formattedPoaEks = formatBulletPoints(text);
      cache.put("WIZ_PT_BENEFIT_" + userId, formattedPoaEks, 600);
-     var botMsgId = sendMessage(chatId, "✅ PoA Eksternal:\n" + formattedPoaEks + "\n\nKapan *Tanggal Mulai* kerjasama ini?\n_(Misal: 10 Oktober 2026)_");
+     var botMsgId = sendMessage(chatId, "✅ PoA Eksternal:\n" + formattedPoaEks + "\n\nKapan *Tanggal Mulai* kerjasama ini?\n_(Contoh: 10/10 atau 10 Oktober 2026)_");
      trackMsg(userId, botMsgId);
      cache.put("WIZ_STATE_" + userId, "PT_MULAI", 600);
      return true;
   }
 
   if (userState === "PT_MULAI") {
-     cache.put("WIZ_PT_MULAI_" + userId, text, 600);
-     var botMsgId = sendMessage(chatId, "✅ Tanggal Mulai: *" + text + "*\n\nDan kapan *Tanggal Selesai* kerjasama ini?");
+     var formattedMulai = formatTanggalInput(text);
+     cache.put("WIZ_PT_MULAI_" + userId, formattedMulai, 600);
+     var botMsgId = sendMessage(chatId, "✅ Tanggal Mulai: *" + formattedMulai + "*\n\nDan kapan *Tanggal Selesai* kerjasama ini?\n_(Contoh: 12/10 atau 12 Oktober 2026)_");
      trackMsg(userId, botMsgId);
      cache.put("WIZ_STATE_" + userId, "PT_SELESAI", 600);
      return true;
   }
 
   if (userState === "PT_SELESAI") {
-     cache.put("WIZ_PT_SELESAI_" + userId, text, 600);
-     var botMsgId = sendMessage(chatId, "✅ Tanggal Selesai: *" + text + "*\n\nTerakhir, kirimkan **Dokumen MoU**.\n_(Harap kirim dalam bentuk File PDF/Word)_", 
+     var formattedSelesai = formatTanggalInput(text);
+     cache.put("WIZ_PT_SELESAI_" + userId, formattedSelesai, 600);
+     var botMsgId = sendMessage(chatId, "✅ Tanggal Selesai: *" + formattedSelesai + "*\n\nTerakhir, kirimkan **Dokumen MoU**.\n_(Harap kirim dalam bentuk File PDF/Word)_", 
          { inline_keyboard: [[{ text: "⏩ Lewati (MoU Belum Ada)", callback_data: "WIZ_SKIP_INPUT" }]] }
      );
      trackMsg(userId, botMsgId);
