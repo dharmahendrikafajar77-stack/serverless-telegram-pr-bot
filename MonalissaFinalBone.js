@@ -1340,6 +1340,19 @@ function handleCallback(callbackQuery) {
   var parts = cbData.split("|");
   var action = parts[0];
   
+  if (action === "WIZ_SKIP_INPUT") {
+      var cache = CacheService.getScriptCache();
+      var state = cache.get("WIZ_STATE_" + userIdCallback);
+      if (state) {
+          var mockMsg = {text: "TBA", from: {id: userIdCallback}};
+          processWizardInput(chatId, userIdCallback, "TBA", null, mockMsg);
+          UrlFetchApp.fetch("https://api.telegram.org/bot" + token + "/answerCallbackQuery?callback_query_id=" + callbackQuery.id + "&text=" + encodeURIComponent("Diisi otomatis: TBA"));
+      } else {
+          UrlFetchApp.fetch("https://api.telegram.org/bot" + token + "/answerCallbackQuery?callback_query_id=" + callbackQuery.id + "&text=" + encodeURIComponent("Sesi sudah berakhir."));
+      }
+      return;
+  }
+  
   if (action.startsWith("NAV_") || action === "MENU_KEMBALI" || action === "ACTION_INFO") {
      var cache = CacheService.getScriptCache();
      cache.remove("WIZ_STATE_" + userIdCallback);
@@ -2484,7 +2497,9 @@ function processWizardInput(chatId, userId, text, userMessageId, msg) {
   
   if (userState === "MEDPART_TGL") {
      cache.put("WIZ_MP_TGL_" + userId, text, 600);
-     var botMsgId = sendMessage(chatId, "✅ Tanggal: *" + text + "*\n\nTerakhir, kirimkan *Link GDrive* atau *Bukti* bahwa syarat Medpart sudah terpenuhi!");
+     var botMsgId = sendMessage(chatId, "✅ Tanggal: *" + text + "*\n\nTerakhir, kirimkan *Link GDrive* atau *Bukti Foto* bahwa syarat Medpart sudah terpenuhi!", 
+         { inline_keyboard: [[{ text: "⏩ Lewati (Data Belum Ada)", callback_data: "WIZ_SKIP_INPUT" }]] }
+     );
      trackMsg(userId, botMsgId);
      cache.put("WIZ_STATE_" + userId, "MEDPART_BUKTI", 600);
      return true;
@@ -2575,7 +2590,9 @@ function processWizardInput(chatId, userId, text, userMessageId, msg) {
   if (userState === "SP_BENEFIT") {
      var formattedBenefit = formatBulletPoints(text);
      cache.put("WIZ_SP_BENEFIT_" + userId, formattedBenefit, 600);
-     var botMsgId = sendMessage(chatId, "✅ Benefit:\n" + formattedBenefit + "\n\nTerakhir, kirimkan **Dokumen MoU**.\n_(Harap kirim dalam bentuk File PDF/Word, ketik 'TBA' jika MoU belum ada)_");
+     var botMsgId = sendMessage(chatId, "✅ Benefit:\n" + formattedBenefit + "\n\nTerakhir, kirimkan **Dokumen MoU**.\n_(Harap kirim dalam bentuk File PDF/Word)_", 
+         { inline_keyboard: [[{ text: "⏩ Lewati (MoU Belum Ada)", callback_data: "WIZ_SKIP_INPUT" }]] }
+     );
      trackMsg(userId, botMsgId);
      cache.put("WIZ_STATE_" + userId, "SP_MOU", 600);
      return true;
@@ -2662,7 +2679,9 @@ function processWizardInput(chatId, userId, text, userMessageId, msg) {
 
   if (userState === "PT_SELESAI") {
      cache.put("WIZ_PT_SELESAI_" + userId, text, 600);
-     var botMsgId = sendMessage(chatId, "✅ Tanggal Selesai: *" + text + "*\n\nTerakhir, kirimkan **Dokumen MoU**.\n_(Harap kirim dalam bentuk File PDF/Word, ketik 'TBA' jika MoU belum ada)_");
+     var botMsgId = sendMessage(chatId, "✅ Tanggal Selesai: *" + text + "*\n\nTerakhir, kirimkan **Dokumen MoU**.\n_(Harap kirim dalam bentuk File PDF/Word)_", 
+         { inline_keyboard: [[{ text: "⏩ Lewati (MoU Belum Ada)", callback_data: "WIZ_SKIP_INPUT" }]] }
+     );
      trackMsg(userId, botMsgId);
      cache.put("WIZ_STATE_" + userId, "PT_MOU", 600);
      return true;
