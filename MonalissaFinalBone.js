@@ -80,6 +80,28 @@ function formatTanggalInput(text) {
   return smartTitleCase(text);
 }
 
+function normalizeTanggalString(text) {
+  var match = text.match(/^(\d{1,2})[-/\s]+([\w]+)(?:[-/\s]+(\d{2,4}))?/);
+  if (match) {
+      var tgl = String(match[1]).padStart(2, '0');
+      var blnRaw = match[2].toLowerCase();
+      var namaBulanArr = ["jan", "feb", "mar", "apr", "mei", "jun", "jul", "agu", "sep", "okt", "nov", "des"];
+      var blnStr = blnRaw;
+      if (isNaN(parseInt(blnRaw, 10))) {
+          for (var i = 0; i < namaBulanArr.length; i++) {
+              if (blnRaw.indexOf(namaBulanArr[i]) === 0) {
+                  blnStr = String(i + 1).padStart(2, '0');
+                  break;
+              }
+          }
+      } else {
+          blnStr = String(parseInt(blnRaw, 10)).padStart(2, '0');
+      }
+      return tgl + "/" + blnStr;
+  }
+  return text;
+}
+
 function simpanFileKeDrive(fileIdTelegram, subFolderName) {
   try {
       var fileDataUrl = "https://api.telegram.org/bot" + token + "/getFile?file_id=" + fileIdTelegram;
@@ -2455,8 +2477,10 @@ function processWizardInput(chatId, userId, text, userMessageId, msg) {
   }
   
   if (userState === "ISI_TGLBLN") {
-    cache.put("WIZ_TGLBLN_" + userId, text, 600);
-    var botMsgId = sendMessage(chatId, "✅ Tanggal: *" + text + "*\n\nJam berapa acaranya dimulai?\n_(Contoh: 09:00 atau 14 30)_");
+    var rawNormalized = normalizeTanggalString(text);
+    var formattedDisplay = formatTanggalInput(text);
+    cache.put("WIZ_TGLBLN_" + userId, rawNormalized, 600);
+    var botMsgId = sendMessage(chatId, "✅ Tanggal: *" + formattedDisplay + "*\n\nJam berapa acaranya dimulai?\n_(Contoh: 09:00 atau 14 30)_");
     trackMsg(userId, botMsgId);
     cache.put("WIZ_STATE_" + userId, "ISI_JAM", 600);
     return true;
