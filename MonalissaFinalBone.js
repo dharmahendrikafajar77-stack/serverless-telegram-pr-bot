@@ -2762,16 +2762,13 @@ function processWizardInput(chatId, userId, text, userMessageId, msg) {
                 return true;
              }
              var fileIdTelegram = msg.photo[msg.photo.length - 1].file_id;
-             var fileDataUrl = "https://api.telegram.org/bot" + token + "/getFile?file_id=" + fileIdTelegram;
-             var response = UrlFetchApp.fetch(fileDataUrl);
-             var filePath = JSON.parse(response.getContentText()).result.file_path;
-             var downloadUrl = "https://api.telegram.org/file/bot" + token + "/" + filePath;
-             var blob = UrlFetchApp.fetch(downloadUrl).getBlob();
+             var directImageUrl = simpanFileKeDrive(fileIdTelegram, "Medpart");
              
-             var folder = DriveApp.getFolderById(folderId);
-             var savedFile = folder.createFile(blob);
-             savedFile.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
-             var directImageUrl = "https://drive.google.com/uc?export=view&id=" + savedFile.getId();
+             if (!directImageUrl) {
+                 var errId = sendMessage(chatId, "❌ Gagal menyimpan poster ke Google Drive.");
+                 trackMsg(userId, errId);
+                 return true;
+             }
              
              sheetMp.getRange(baris, 8).setFormula('=IMAGE("' + directImageUrl + '")');
              clearWizardMessages(chatId, userId);
@@ -2917,19 +2914,13 @@ function processWizardInput(chatId, userId, text, userMessageId, msg) {
       trackMsg(userId, userMessageId);
       
       var fileIdTelegram = msg.photo[msg.photo.length - 1].file_id;
+      var directImageUrl = simpanFileKeDrive(fileIdTelegram, "Undangan");
       
-      var fileDataUrl = "https://api.telegram.org/bot" + token + "/getFile?file_id=" + fileIdTelegram;
-      var response = UrlFetchApp.fetch(fileDataUrl);
-      var filePath = JSON.parse(response.getContentText()).result.file_path;
-      var downloadUrl = "https://api.telegram.org/file/bot" + token + "/" + filePath;
-      var blob = UrlFetchApp.fetch(downloadUrl).getBlob();
-      
-      var folder = DriveApp.getFolderById(folderId);
-      var savedFile = folder.createFile(blob);
-      savedFile.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
-      
-      var fileIdDrive = savedFile.getId();
-      var directImageUrl = "https://drive.google.com/uc?export=view&id=" + fileIdDrive;
+      if (!directImageUrl) {
+          sendMessage(chatId, "❌ Gagal menyimpan Bukti Kehadiran ke Google Drive.");
+          clearWizardMessages(chatId, userId);
+          return true;
+      }
       
       var sheet = SpreadsheetApp.openById(sheetId).getSheetByName("Undangan");
       var dataAll = sheet.getDataRange().getValues();
