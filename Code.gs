@@ -1599,8 +1599,19 @@ function handleCallback(callbackQuery) {
          [{"text": "🔙 Menu Utama", "callback_data": "MENU_KEMBALI"}]
      ]};
      UrlFetchApp.fetch("https://api.telegram.org/bot" + token + "/editMessageText", { method: "post", contentType: "application/json", payload: JSON.stringify({ chat_id: String(chatId), message_id: messageId, text: textBaru, parse_mode: "Markdown", reply_markup: keyboard }), muteHttpExceptions: true });
-     return UrlFetchApp.fetch("https://api.telegram.org/bot" + token + "/answerCallbackQuery?callback_query_id=" + callbackQuery.id);
-  }
+      return UrlFetchApp.fetch("https://api.telegram.org/bot" + token + "/answerCallbackQuery?callback_query_id=" + callbackQuery.id);
+   }
+
+   if (action === "MENU_ADMIN_BROADCAST") {
+      var textBaru = "📢 *BROADCAST KE SELURUH STAFF PR*\n\nSilakan ketikkan pesan yang ingin kamu sebarkan. Semua anggota PR yang sudah mendaftar akan menerima pesan ini lewat DM.\n\n_(Ketik `/batal` jika ingin membatalkan)_";
+      var keyboard = { inline_keyboard: [[{"text": "🔙 Batal", "callback_data": "NAV_ADMIN"}]] };
+      UrlFetchApp.fetch("https://api.telegram.org/bot" + token + "/editMessageText", { method: "post", contentType: "application/json", payload: JSON.stringify({ chat_id: String(chatId), message_id: messageId, text: textBaru, parse_mode: "Markdown", reply_markup: keyboard }), muteHttpExceptions: true });
+      
+      var cache = CacheService.getScriptCache();
+      cache.put("WIZ_STATE_" + userIdCallback, "WIZ_ADMIN_BROADCAST", 600);
+      trackMsg(userIdCallback, messageId);
+      return UrlFetchApp.fetch("https://api.telegram.org/bot" + token + "/answerCallbackQuery?callback_query_id=" + callbackQuery.id);
+   }
 
   if (action === "MENU_ADMIN_HAPUS") {
      var textBaru = "🗑️ *HAPUS DATA (ADMIN)*\n\nSilakan pilih modul mana yang datanya ingin dihapus permanen:";
@@ -1876,24 +1887,19 @@ function handleCallback(callbackQuery) {
   // Matikan efek loading di tombol Telegram untuk action lain
   UrlFetchApp.fetch("https://api.telegram.org/bot" + token + "/answerCallbackQuery?callback_query_id=" + callbackQuery.id);
   
-  if (action === "DL") {
-     var idSuratDicari = parts[1];
-     var namaBaku = parts[2];
-     prosesDelegasiSheet(chatId, idSuratDicari, namaBaku);
-  } else if (action === "DF") {
-     var userId = parts[1];
-     var namaBaku = parts[2];
-     prosesDaftarUser(chatId, userId, namaBaku);
-  }
-  
-  // Hapus tombol setelah diklik (edit pesan)
-  var payloadEdit = {
-     chat_id: String(chatId),
-     message_id: messageId,
-     text: "✅ Pilihan nama *" + namaBaku + "* sedang diproses oleh Monalissa... 💅",
-     parse_mode: "Markdown"
-  };
-  UrlFetchApp.fetch("https://api.telegram.org/bot" + token + "/editMessageText", { method: "post", contentType: "application/json", payload: JSON.stringify(payloadEdit) });
+   if (action === "DL") {
+      var idSuratDicari = parts[1];
+      var namaBaku = parts[2];
+      prosesDelegasiSheet(chatId, idSuratDicari, namaBaku);
+      var payloadEdit = { chat_id: String(chatId), message_id: messageId, text: "✅ Pilihan nama *" + namaBaku + "* sedang diproses oleh Monalissa... 💅", parse_mode: "Markdown" };
+      UrlFetchApp.fetch("https://api.telegram.org/bot" + token + "/editMessageText", { method: "post", contentType: "application/json", payload: JSON.stringify(payloadEdit) });
+   } else if (action === "DF") {
+      var userId = parts[1];
+      var namaBaku = parts[2];
+      prosesDaftarUser(chatId, userId, namaBaku);
+      var payloadEdit = { chat_id: String(chatId), message_id: messageId, text: "✅ Pendaftaran untuk *" + namaBaku + "* sedang diproses oleh Monalissa... 💅", parse_mode: "Markdown" };
+      UrlFetchApp.fetch("https://api.telegram.org/bot" + token + "/editMessageText", { method: "post", contentType: "application/json", payload: JSON.stringify(payloadEdit) });
+   }
 }
 
 function prosesDaftarUser(chatId, userId, namaBaku) {
@@ -2653,6 +2659,25 @@ function processWizardInput(chatId, userId, text, userMessageId, msg) {
       }
       
       return true;
+  }
+
+  if (userState === "WIZ_ADMIN_BROADCAST") {
+     cache.remove("WIZ_STATE_" + userId);
+     trackMsg(userId, userMessageId);
+     
+     var sheetUser = SpreadsheetApp.openById(sheetId).getSheetByName("User_Bot");
+     var dataUser = sheetUser.getDataRange().getValues();
+     var count = 0;
+     
+     for (var u = 1; u < dataUser.length; u++) { 
+       if (dataUser[u][0]) {
+         sendMessage(dataUser[u][0], "📢 *PENGUMUMAN DARI ADMIN PR:*\n\n" + text);
+         count++;
+       }
+     }
+     clearWizardMessages(chatId, userId);
+     kirimMenuUtama(chatId, "✅ Pesan broadcast berhasil dikirim ke " + count + " anggota.");
+     return true;
   }
 
   if (userState.startsWith("WIZ_ADMIN_HAPUS|")) {
