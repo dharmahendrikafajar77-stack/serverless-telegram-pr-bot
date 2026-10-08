@@ -20,6 +20,27 @@ function smartTitleCase(str) {
   return result;
 }
 
+function formatBulletPoints(text) {
+  if (!text) return "";
+  var baris = text.split(/\n+/);
+  var hasil = [];
+  for (var i = 0; i < baris.length; i++) {
+     var str = baris[i].trim();
+     if (str.length === 0) continue;
+     
+     // Hapus karakter awal yang tidak rapi (dash, bintang, nomor berurutan dll)
+     str = str.replace(/^[\-\*\•\>]+/, "").trim();
+     str = str.replace(/^\d+[\.\)]+/, "").trim(); 
+     
+     if (str.length > 0) {
+        // Kapital huruf pertama saja untuk kerapian ekstra
+        str = str.charAt(0).toUpperCase() + str.slice(1);
+        hasil.push("• " + str);
+     }
+  }
+  return hasil.join("\n");
+}
+
 function doPost(e) {
   if (!e || !e.postData || !e.postData.contents) return;
   
@@ -2489,15 +2510,16 @@ function processWizardInput(chatId, userId, text, userMessageId, msg) {
 
   if (userState === "SP_TGL") {
      cache.put("WIZ_SP_TGL_" + userId, text, 600);
-     var botMsgId = sendMessage(chatId, "✅ Tanggal: *" + text + "*\n\nApa saja *Persyaratan* dari sponsor tersebut?");
+     var botMsgId = sendMessage(chatId, "✅ Tanggal: *" + text + "*\n\nApa saja *Persyaratan* dari sponsor tersebut?\n_(Gunakan baris baru (Enter) untuk memisah antar poin)_");
      trackMsg(userId, botMsgId);
      cache.put("WIZ_STATE_" + userId, "SP_SYARAT", 600);
      return true;
   }
 
   if (userState === "SP_SYARAT") {
-     cache.put("WIZ_SP_SYARAT_" + userId, text, 600);
-     var botMsgId = sendMessage(chatId, "✅ Persyaratan: *" + text + "*\n\nTerakhir, apa saja *Benefit* yang kita dapatkan?");
+     var formattedSyarat = formatBulletPoints(text);
+     cache.put("WIZ_SP_SYARAT_" + userId, formattedSyarat, 600);
+     var botMsgId = sendMessage(chatId, "✅ Persyaratan:\n" + formattedSyarat + "\n\nTerakhir, apa saja *Benefit* yang kita dapatkan?\n_(Gunakan baris baru (Enter) untuk memisah antar poin)_");
      trackMsg(userId, botMsgId);
      cache.put("WIZ_STATE_" + userId, "SP_BENEFIT", 600);
      return true;
@@ -2507,7 +2529,7 @@ function processWizardInput(chatId, userId, text, userMessageId, msg) {
      var instansi = cache.get("WIZ_SP_INSTANSI_" + userId) || "";
      var tgl = cache.get("WIZ_SP_TGL_" + userId) || "";
      var syarat = cache.get("WIZ_SP_SYARAT_" + userId) || "";
-     var benefit = text;
+     var benefit = formatBulletPoints(text);
 
      cache.remove("WIZ_STATE_" + userId);
      
@@ -2536,23 +2558,25 @@ function processWizardInput(chatId, userId, text, userMessageId, msg) {
   // =====================
   if (userState === "PT_INSTANSI") {
      cache.put("WIZ_PT_INSTANSI_" + userId, text, 600);
-     var botMsgId = sendMessage(chatId, "✅ Instansi: *" + text + "*\n\nApa saja **Point of Agreement (PoA) UKBA**?\n_(Kewajiban/tugas dari pihak PR UKBA)_");
+     var botMsgId = sendMessage(chatId, "✅ Instansi: *" + text + "*\n\nApa saja **Point of Agreement (PoA) UKBA**?\n_(Kewajiban pihak PR UKBA, gunakan Enter untuk memisah poin)_");
      trackMsg(userId, botMsgId);
      cache.put("WIZ_STATE_" + userId, "PT_SYARAT", 600);
      return true;
   }
 
   if (userState === "PT_SYARAT") {
-     cache.put("WIZ_PT_SYARAT_" + userId, text, 600);
-     var botMsgId = sendMessage(chatId, "✅ PoA UKBA: *" + text + "*\n\nApa saja **Point of Agreement (PoA) EKSTERNAL**?\n_(Kewajiban/tugas dari pihak Partner)_");
+     var formattedPoaUkba = formatBulletPoints(text);
+     cache.put("WIZ_PT_SYARAT_" + userId, formattedPoaUkba, 600);
+     var botMsgId = sendMessage(chatId, "✅ PoA UKBA:\n" + formattedPoaUkba + "\n\nApa saja **Point of Agreement (PoA) EKSTERNAL**?\n_(Kewajiban pihak Partner, gunakan Enter untuk memisah poin)_");
      trackMsg(userId, botMsgId);
      cache.put("WIZ_STATE_" + userId, "PT_BENEFIT", 600);
      return true;
   }
 
   if (userState === "PT_BENEFIT") {
-     cache.put("WIZ_PT_BENEFIT_" + userId, text, 600);
-     var botMsgId = sendMessage(chatId, "✅ PoA Eksternal: *" + text + "*\n\nKapan *Tanggal Mulai* kerjasama ini?\n_(Misal: 10 Oktober 2026)_");
+     var formattedPoaEks = formatBulletPoints(text);
+     cache.put("WIZ_PT_BENEFIT_" + userId, formattedPoaEks, 600);
+     var botMsgId = sendMessage(chatId, "✅ PoA Eksternal:\n" + formattedPoaEks + "\n\nKapan *Tanggal Mulai* kerjasama ini?\n_(Misal: 10 Oktober 2026)_");
      trackMsg(userId, botMsgId);
      cache.put("WIZ_STATE_" + userId, "PT_MULAI", 600);
      return true;
