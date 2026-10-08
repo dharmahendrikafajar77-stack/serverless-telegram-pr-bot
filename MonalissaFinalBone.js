@@ -41,6 +41,28 @@ function formatBulletPoints(text) {
   return hasil.join("\n");
 }
 
+function simpanFileKeDrive(fileIdTelegram) {
+  try {
+      var fileDataUrl = "https://api.telegram.org/bot" + token + "/getFile?file_id=" + fileIdTelegram;
+      var response = UrlFetchApp.fetch(fileDataUrl);
+      var result = JSON.parse(response.getContentText()).result;
+      if (!result) return null;
+      
+      var filePath = result.file_path;
+      var downloadUrl = "https://api.telegram.org/file/bot" + token + "/" + filePath;
+      var blob = UrlFetchApp.fetch(downloadUrl).getBlob();
+      
+      var folder = DriveApp.getFolderById(folderId);
+      var savedFile = folder.createFile(blob);
+      savedFile.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
+      
+      return "https://drive.google.com/uc?export=view&id=" + savedFile.getId();
+  } catch(e) {
+      Logger.log("Gagal simpan file: " + e.message);
+      return null;
+  }
+}
+
 function doPost(e) {
   if (!e || !e.postData || !e.postData.contents) return;
   
@@ -2457,9 +2479,22 @@ function processWizardInput(chatId, userId, text, userMessageId, msg) {
   }
   
   if (userState === "MEDPART_BUKTI") {
+     var fileLink = text;
+     if (msg && msg.document) {
+         var fileId = msg.document.file_id;
+         sendMessage(chatId, "⏳ Mengunggah Dokumen Bukti ke GDrive...");
+         var urlDrive = simpanFileKeDrive(fileId);
+         if (urlDrive) fileLink = urlDrive;
+     } else if (msg && msg.photo && msg.photo.length > 0) {
+         var fileId = msg.photo[msg.photo.length - 1].file_id;
+         sendMessage(chatId, "⏳ Mengunggah Foto Bukti ke GDrive...");
+         var urlDrive = simpanFileKeDrive(fileId);
+         if (urlDrive) fileLink = urlDrive;
+     }
+
      var instansi = cache.get("WIZ_MP_INSTANSI_" + userId) || "";
      var tglUpload = cache.get("WIZ_MP_TGL_" + userId) || "";
-     var bukti = text;
+     var bukti = fileLink;
      
      cache.remove("WIZ_STATE_" + userId);
      
@@ -2526,10 +2561,33 @@ function processWizardInput(chatId, userId, text, userMessageId, msg) {
   }
 
   if (userState === "SP_BENEFIT") {
+     var formattedBenefit = formatBulletPoints(text);
+     cache.put("WIZ_SP_BENEFIT_" + userId, formattedBenefit, 600);
+     var botMsgId = sendMessage(chatId, "✅ Benefit:\n" + formattedBenefit + "\n\nTerakhir, kirimkan **Dokumen MoU** (File PDF, Foto, atau Link).\n_(Ketik 'TBA' jika MoU belum ada)_");
+     trackMsg(userId, botMsgId);
+     cache.put("WIZ_STATE_" + userId, "SP_MOU", 600);
+     return true;
+  }
+
+  if (userState === "SP_MOU") {
+     var fileLink = text;
+     if (msg && msg.document) {
+         var fileId = msg.document.file_id;
+         sendMessage(chatId, "⏳ Mengunggah Dokumen MoU ke GDrive...");
+         var urlDrive = simpanFileKeDrive(fileId);
+         if (urlDrive) fileLink = urlDrive;
+     } else if (msg && msg.photo && msg.photo.length > 0) {
+         var fileId = msg.photo[msg.photo.length - 1].file_id;
+         sendMessage(chatId, "⏳ Mengunggah Foto MoU ke GDrive...");
+         var urlDrive = simpanFileKeDrive(fileId);
+         if (urlDrive) fileLink = urlDrive;
+     }
+
      var instansi = cache.get("WIZ_SP_INSTANSI_" + userId) || "";
      var tgl = cache.get("WIZ_SP_TGL_" + userId) || "";
      var syarat = cache.get("WIZ_SP_SYARAT_" + userId) || "";
-     var benefit = formatBulletPoints(text);
+     var benefit = cache.get("WIZ_SP_BENEFIT_" + userId) || "";
+     var mou = fileLink;
 
      cache.remove("WIZ_STATE_" + userId);
      
@@ -2541,11 +2599,11 @@ function processWizardInput(chatId, userId, text, userMessageId, msg) {
      
      var barisTujuan = sheetSp.getLastRow() + 1;
      var nomorUrut = barisTujuan > 2 ? barisTujuan - 2 : 1; 
-     sheetSp.appendRow([nomorUrut, smartTitleCase(instansi), tgl, syarat, benefit, ""]);
+     sheetSp.appendRow([nomorUrut, smartTitleCase(instansi), tgl, syarat, benefit, mou]);
      
      clearWizardMessages(chatId, userId);
      
-     var balasan = "💰 *SPONSORSHIP BARU TERCATAT!* 💰\n\n*Instansi:* " + smartTitleCase(instansi) + "\n*Tanggal:* " + tgl + "\n*Syarat:* " + syarat + "\n*Benefit:* " + benefit;
+     var balasan = "💰 *SPONSORSHIP BARU TERCATAT!* 💰\n\n*Instansi:* " + smartTitleCase(instansi) + "\n*Tanggal:* " + tgl + "\n*Syarat:* \n" + syarat + "\n*Benefit:* \n" + benefit + "\n*MoU:* " + (mou || "TBA");
      kirimMenuUtama(chatId, balasan);
      if (grupChatId && String(chatId) !== String(grupChatId)) {
        sendMessage(grupChatId, balasan);
@@ -2591,11 +2649,33 @@ function processWizardInput(chatId, userId, text, userMessageId, msg) {
   }
 
   if (userState === "PT_SELESAI") {
+     cache.put("WIZ_PT_SELESAI_" + userId, text, 600);
+     var botMsgId = sendMessage(chatId, "✅ Tanggal Selesai: *" + text + "*\n\nTerakhir, kirimkan **Dokumen MoU** (File PDF, Foto, atau Link).\n_(Ketik 'TBA' jika MoU belum ada)_");
+     trackMsg(userId, botMsgId);
+     cache.put("WIZ_STATE_" + userId, "PT_MOU", 600);
+     return true;
+  }
+
+  if (userState === "PT_MOU") {
+     var fileLink = text;
+     if (msg && msg.document) {
+         var fileId = msg.document.file_id;
+         sendMessage(chatId, "⏳ Mengunggah Dokumen MoU ke GDrive...");
+         var urlDrive = simpanFileKeDrive(fileId);
+         if (urlDrive) fileLink = urlDrive;
+     } else if (msg && msg.photo && msg.photo.length > 0) {
+         var fileId = msg.photo[msg.photo.length - 1].file_id;
+         sendMessage(chatId, "⏳ Mengunggah Foto MoU ke GDrive...");
+         var urlDrive = simpanFileKeDrive(fileId);
+         if (urlDrive) fileLink = urlDrive;
+     }
+
      var instansi = cache.get("WIZ_PT_INSTANSI_" + userId) || "";
      var syarat = cache.get("WIZ_PT_SYARAT_" + userId) || "";
      var benefit = cache.get("WIZ_PT_BENEFIT_" + userId) || "";
      var mulai = cache.get("WIZ_PT_MULAI_" + userId) || "";
-     var selesai = text;
+     var selesai = cache.get("WIZ_PT_SELESAI_" + userId) || "";
+     var mou = fileLink;
 
      cache.remove("WIZ_STATE_" + userId);
      
@@ -2607,11 +2687,11 @@ function processWizardInput(chatId, userId, text, userMessageId, msg) {
      
      var barisTujuan = sheetPt.getLastRow() + 1;
      var nomorUrut = barisTujuan > 2 ? barisTujuan - 2 : 1;
-     sheetPt.appendRow([nomorUrut, smartTitleCase(instansi), syarat, benefit, mulai, selesai, ""]);
+     sheetPt.appendRow([nomorUrut, smartTitleCase(instansi), syarat, benefit, mulai, selesai, mou]);
      
      clearWizardMessages(chatId, userId);
      
-     var balasan = "🔗 *PARTNERSHIP BARU TERCATAT!* 🔗\n\n*Instansi:* " + smartTitleCase(instansi) + "\n*Periode:* " + mulai + " - " + selesai + "\n*PoA UKBA:* " + syarat + "\n*PoA Eksternal:* " + benefit;
+     var balasan = "🔗 *PARTNERSHIP BARU TERCATAT!* 🔗\n\n*Instansi:* " + smartTitleCase(instansi) + "\n*Periode:* " + mulai + " - " + selesai + "\n*PoA UKBA:* \n" + syarat + "\n*PoA Eksternal:* \n" + benefit + "\n*MoU:* " + (mou || "TBA");
      kirimMenuUtama(chatId, balasan);
      if (grupChatId && String(chatId) !== String(grupChatId)) {
        sendMessage(grupChatId, balasan);
