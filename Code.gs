@@ -2692,10 +2692,17 @@ function processWizardInput(chatId, userId, text, userMessageId, msg) {
                  found = true; 
                  if (modul === "UNDANGAN") {
                      var wktRaw = dataAll[i][5];
-                     var wktFormat = (wktRaw instanceof Date) ? Utilities.formatDate(wktRaw, "Asia/Jakarta", "dd/MM/yyyy HH:mm") : String(wktRaw);
-                     info = dataAll[i][3] + " - " + dataAll[i][4] + "\nWaktu: " + wktFormat + "\nLokasi: " + dataAll[i][6];
+                     var wktFormat = "";
+                     if (wktRaw) {
+                         wktFormat = (wktRaw instanceof Date) ? Utilities.formatDate(wktRaw, "Asia/Jakarta", "dd/MMM/yyyy HH:mm") : String(wktRaw);
+                     }
+                     var keg = dataAll[i][4] ? String(dataAll[i][4]).trim() : "(Kegiatan Kosong)";
+                     var lok = dataAll[i][6] ? String(dataAll[i][6]).trim() : "(Lokasi Kosong)";
+                     var wktStr = wktFormat ? wktFormat : "(Waktu Kosong)";
+                     
+                     info = "*" + (dataAll[i][3] || "Tanpa Pengirim") + "* - " + keg + "\n🗓️ *Waktu:* " + wktStr + "\n📍 *Lokasi:* " + lok;
                  } else {
-                     info = dataAll[i][3]; // Medpart instansi
+                     info = dataAll[i][3] ? String(dataAll[i][3]).trim() : "(Data Kosong)"; // Medpart instansi
                  }
                  break; 
              }
