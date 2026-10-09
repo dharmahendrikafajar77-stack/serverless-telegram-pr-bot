@@ -1926,17 +1926,15 @@ function handleCallback(callbackQuery) {
   }
 
   if (action === "NAV_INFO_SPONSOR") {
-     var textBaru = "💰 *INFO SPONSORSHIP*\n\nBelum ada rekap otomatis untuk modul ini. Cek spreadsheet untuk data detail.";
-     var keyboard = { inline_keyboard: [[{"text": "🔙 Kembali", "callback_data": "NAV_INFORMASI"}]] };
-     UrlFetchApp.fetch("https://api.telegram.org/bot" + token + "/editMessageText", { method: "post", contentType: "application/json", payload: JSON.stringify({ chat_id: String(chatId), message_id: messageId, text: textBaru, parse_mode: "Markdown", reply_markup: keyboard }), muteHttpExceptions: true });
-     return UrlFetchApp.fetch("https://api.telegram.org/bot" + token + "/answerCallbackQuery?callback_query_id=" + callbackQuery.id);
+     UrlFetchApp.fetch("https://api.telegram.org/bot" + token + "/answerCallbackQuery?callback_query_id=" + callbackQuery.id);
+     handleInfoCommand(chatId, "/info sponsor");
+     return true;
   }
 
   if (action === "NAV_INFO_PARTNER") {
-     var textBaru = "🔗 *INFO PARTNERSHIP*\n\nBelum ada rekap otomatis untuk modul ini. Cek spreadsheet untuk data detail.";
-     var keyboard = { inline_keyboard: [[{"text": "🔙 Kembali", "callback_data": "NAV_INFORMASI"}]] };
-     UrlFetchApp.fetch("https://api.telegram.org/bot" + token + "/editMessageText", { method: "post", contentType: "application/json", payload: JSON.stringify({ chat_id: String(chatId), message_id: messageId, text: textBaru, parse_mode: "Markdown", reply_markup: keyboard }), muteHttpExceptions: true });
-     return UrlFetchApp.fetch("https://api.telegram.org/bot" + token + "/answerCallbackQuery?callback_query_id=" + callbackQuery.id);
+     UrlFetchApp.fetch("https://api.telegram.org/bot" + token + "/answerCallbackQuery?callback_query_id=" + callbackQuery.id);
+     handleInfoCommand(chatId, "/info partner");
+     return true;
   }
 
   if (action === "MENU_UPLOAD_FOTO_UNDANGAN") {
@@ -3276,6 +3274,109 @@ function handleInfoCommand(chatId, inputInfo) {
          if (pesanKirim.trim() !== "") botMsgId = sendMessage(chatId, pesanKirim.trim(), keyboardEdit);
       } else {
          botMsgId = sendMessage(chatId, finalMp.trim(), keyboardEdit);
+      }
+      
+      if (botMsgId) {
+          var cache = CacheService.getScriptCache();
+          cache.put("LAST_MENU_" + chatId, String(botMsgId), 21600);
+      }
+      return;
+    }
+    
+    if (inputInfo === "/info sponsor") {
+      var sheetSp = SpreadsheetApp.openById(sheetId).getSheetByName("Sponsorship") || SpreadsheetApp.openById(sheetId).getSheetByName("Sponsor");
+      if (!sheetSp) return sendMessage(chatId, "❌ Sheet Sponsorship tidak ditemukan!");
+      
+      var dataSp = sheetSp.getDataRange().getValues();
+      var listSp = "";
+      var countSp = 0;
+      
+      for (var i = 2; i < dataSp.length; i++) {
+         var idSp = dataSp[i][1];
+         var instansi = dataSp[i][2];
+         var tgl = dataSp[i][3];
+         var mou = dataSp[i][6] ? String(dataSp[i][6]).trim() : "";
+         
+         if (idSp && instansi) {
+            var statusMou = (mou !== "" && mou.toLowerCase() !== "belum ada data" && mou.toLowerCase() !== "❌ belum ada data") ? "✅ Tersedia" : "❌ Belum Ada";
+            listSp += "🔹 *" + idSp + "* (" + instansi + ")\n🗓️ Tgl: " + formatTanggalInput(tgl) + "\n📑 MoU: " + statusMou + "\n\n";
+            countSp++;
+         }
+      }
+      
+      if (countSp === 0) {
+         return sendMessage(chatId, "✨ *Belum Ada Sponsorship* ✨\n\nBelum ada data instansi untuk Sponsorship.");
+      }
+      
+      var finalSp = "💰 *STATUS SPONSORSHIP TERKINI* 💰\n\n" + listSp;
+      var keyboardEdit = { inline_keyboard: [[{ text: "🔙 Kembali", callback_data: "NAV_INFORMASI" }]] };
+      
+      var botMsgId = null;
+      if (finalSp.length > 4000) {
+         var pesanArray = finalSp.split("\n\n");
+         var pesanKirim = "";
+         for (var p = 0; p < pesanArray.length; p++) {
+            if ((pesanKirim.length + pesanArray[p].length) > 4000) {
+               sendMessage(chatId, pesanKirim.trim());
+               pesanKirim = "";
+            }
+            pesanKirim += pesanArray[p] + "\n\n";
+         }
+         if (pesanKirim.trim() !== "") botMsgId = sendMessage(chatId, pesanKirim.trim(), keyboardEdit);
+      } else {
+         botMsgId = sendMessage(chatId, finalSp.trim(), keyboardEdit);
+      }
+      
+      if (botMsgId) {
+          var cache = CacheService.getScriptCache();
+          cache.put("LAST_MENU_" + chatId, String(botMsgId), 21600);
+      }
+      return;
+    }
+    
+    if (inputInfo === "/info partner") {
+      var sheetPt = SpreadsheetApp.openById(sheetId).getSheetByName("Partnership") || SpreadsheetApp.openById(sheetId).getSheetByName("Partner");
+      if (!sheetPt) return sendMessage(chatId, "❌ Sheet Partnership tidak ditemukan!");
+      
+      var dataPt = sheetPt.getDataRange().getValues();
+      var listPt = "";
+      var countPt = 0;
+      
+      for (var i = 2; i < dataPt.length; i++) {
+         var idPt = dataPt[i][1];
+         var instansi = dataPt[i][2];
+         var mulai = dataPt[i][3];
+         var selesai = dataPt[i][4];
+         var mou = dataPt[i][7] ? String(dataPt[i][7]).trim() : "";
+         
+         if (idPt && instansi) {
+            var statusMou = (mou !== "" && mou.toLowerCase() !== "belum ada data" && mou.toLowerCase() !== "❌ belum ada data") ? "✅ Tersedia" : "❌ Belum Ada";
+            listPt += "🔹 *" + idPt + "* (" + instansi + ")\n🗓️ Periode: " + formatTanggalInput(mulai) + " - " + formatTanggalInput(selesai) + "\n📑 MoU: " + statusMou + "\n\n";
+            countPt++;
+         }
+      }
+      
+      if (countPt === 0) {
+         return sendMessage(chatId, "✨ *Belum Ada Partnership* ✨\n\nBelum ada data instansi untuk Partnership.");
+      }
+      
+      var finalPt = "🔗 *STATUS PARTNERSHIP TERKINI* 🔗\n\n" + listPt;
+      var keyboardEdit = { inline_keyboard: [[{ text: "🔙 Kembali", callback_data: "NAV_INFORMASI" }]] };
+      
+      var botMsgId = null;
+      if (finalPt.length > 4000) {
+         var pesanArray = finalPt.split("\n\n");
+         var pesanKirim = "";
+         for (var p = 0; p < pesanArray.length; p++) {
+            if ((pesanKirim.length + pesanArray[p].length) > 4000) {
+               sendMessage(chatId, pesanKirim.trim());
+               pesanKirim = "";
+            }
+            pesanKirim += pesanArray[p] + "\n\n";
+         }
+         if (pesanKirim.trim() !== "") botMsgId = sendMessage(chatId, pesanKirim.trim(), keyboardEdit);
+      } else {
+         botMsgId = sendMessage(chatId, finalPt.trim(), keyboardEdit);
       }
       
       if (botMsgId) {
