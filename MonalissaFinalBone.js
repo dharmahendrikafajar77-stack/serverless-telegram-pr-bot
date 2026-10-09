@@ -42,10 +42,21 @@ function formatBulletPoints(text) {
 }
 
 function formatTanggalInput(text) {
-  var teksLower = String(text).trim().toLowerCase();
-  if (teksLower === "tba" || teksLower === "❌ belum ada data") return text;
+  if (text instanceof Date) {
+      var tglObj = text;
+      var tgl = String(tglObj.getDate()).padStart(2, '0');
+      var blnIndex = tglObj.getMonth();
+      var thn = tglObj.getFullYear();
+      var namaHari = ["Minggu", "Senin", "Selasa", "Rabu", "Kamis", "Jumat", "Sabtu"][tglObj.getDay()];
+      var namaBulanArr = ["Januari", "Februari", "Maret", "April", "Mei", "Juni", "Juli", "Agustus", "September", "Oktober", "November", "Desember"];
+      return namaHari + ", " + tgl + " " + namaBulanArr[blnIndex] + " " + thn;
+  }
+
+  var strText = String(text).trim();
+  var teksLower = strText.toLowerCase();
+  if (teksLower === "tba" || teksLower === "❌ belum ada data" || strText === "") return strText;
   
-  var match = text.match(/^(\d{1,2})[-/\s]+([\w]+)(?:[-/\s]+(\d{2,4}))?/);
+  var match = strText.match(/^(\d{1,2})[-/\s]+([\w]+)(?:[-/\s]+(\d{2,4}))?/);
   if (match) {
       var tgl = String(match[1]).padStart(2, '0');
       var blnRaw = match[2].toLowerCase();
@@ -70,7 +81,7 @@ function formatTanggalInput(text) {
           var tglObj = new Date(parseInt(thn), blnIndex, parseInt(tgl));
           var namaHari = ["Minggu", "Senin", "Selasa", "Rabu", "Kamis", "Jumat", "Sabtu"][tglObj.getDay()];
           
-          var sisa = text.replace(match[0], "").trim();
+          var sisa = strText.replace(match[0], "").trim();
           var hasil = namaHari + ", " + tgl + " " + namaBulanArr[blnIndex] + " " + thn;
           if (sisa) hasil += " " + sisa;
           return hasil;
@@ -81,7 +92,12 @@ function formatTanggalInput(text) {
 }
 
 function normalizeTanggalString(text) {
-  var match = text.match(/^(\d{1,2})[-/\s]+([\w]+)(?:[-/\s]+(\d{2,4}))?/);
+  if (text instanceof Date) {
+      return String(text.getDate()).padStart(2, '0') + "/" + String(text.getMonth() + 1).padStart(2, '0');
+  }
+  
+  var strText = String(text).trim();
+  var match = strText.match(/^(\d{1,2})[-/\s]+([\w]+)(?:[-/\s]+(\d{2,4}))?/);
   if (match) {
       var tgl = String(match[1]).padStart(2, '0');
       var blnRaw = match[2].toLowerCase();
@@ -1926,13 +1942,13 @@ function handleCallback(callbackQuery) {
   }
 
   if (action === "NAV_INFO_SPONSOR") {
-     UrlFetchApp.fetch("https://api.telegram.org/bot" + token + "/answerCallbackQuery?callback_query_id=" + callbackQuery.id);
+     UrlFetchApp.fetch("https://api.telegram.org/bot" + token + "/answerCallbackQuery?callback_query_id=" + callbackQuery.id, { muteHttpExceptions: true });
      handleInfoCommand(chatId, "/info sponsor");
      return true;
   }
 
   if (action === "NAV_INFO_PARTNER") {
-     UrlFetchApp.fetch("https://api.telegram.org/bot" + token + "/answerCallbackQuery?callback_query_id=" + callbackQuery.id);
+     UrlFetchApp.fetch("https://api.telegram.org/bot" + token + "/answerCallbackQuery?callback_query_id=" + callbackQuery.id, { muteHttpExceptions: true });
      handleInfoCommand(chatId, "/info partner");
      return true;
   }
