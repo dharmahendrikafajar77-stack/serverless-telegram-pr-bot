@@ -270,7 +270,8 @@ function processUpdate(update) {
        var cloverKeyboard = {
          "keyboard": menuUtamaKbd,
          "resize_keyboard": true,
-         "one_time_keyboard": false
+         "one_time_keyboard": false,
+         "is_persistent": true
        };
        sendMessage(chatId, "Halo *" + dataUserVerif.nama + "*! Kenalin, aku *Monalissa* 💅, asisten digital 24 jam kebanggaan divisi PR UKBA.\n\nKetik `/tutor` kalau kamu butuh panduan, atau navigasi langsung lewat menu di bawah ini!\n\n🍀 _Kamu juga bisa pakai tombol akses cepat (clover) kapan saja!_", cloverKeyboard);
        kirimMenuUtama(chatId, "Selamat datang di *Menu Interaktif Monalissa*! 💅\nSilakan pilih menu utama di bawah ini:", dataUserVerif.isAdmin);
