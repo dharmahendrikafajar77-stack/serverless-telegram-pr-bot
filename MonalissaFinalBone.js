@@ -2310,9 +2310,11 @@ function extractUndanganWithGemini(textInput) {
                "5. Edit Data Undangan/Medpart: /edit ID Kolom NilaiBaru (Kolom Undangan: Pengirim/Kegiatan/Waktu/Lokasi | Kolom Medpart: Instansi/Cp/Tanggal/Bukti)\n" +
                "6. Upload Foto Bukti: /f ID_Surat\n" +
                "7. Input Media Partner: /mp\\nInstansi: NamaInstansi\\nCp: NamaAtauNomor\\nTanggal Upload: DD/MM\\nLink Bukti: LinkGDrive\n" +
-               "8. Upload Poster Media Partner: /fmp ID_Medpart\n" +
-               "9. Cek Status Medpart: /info medpart\n" +
-               "10. Cek Status Undangan: /info (jadwal mendatang), /info semua (seluruh data), atau /info bulan [nama_bulan]\n\n" +
+               "8. Input Sponsorship: /sp\\nInstansi: NamaInstansi\\nTanggal: DD/MM\\nPersyaratan: Syarat1, Syarat2\\nBenefit: Benefit1\n" +
+               "9. Input Partnership: /pt\\nInstansi: NamaInstansi\\nPersyaratan: Syarat1\\nBenefit: Benefit1\\nMulai: DD/MM\\nSelesai: DD/MM\n" +
+               "10. Upload Poster Media Partner: /fmp ID_Medpart\n" +
+               "11. Cek Status Medpart: /info medpart\n" +
+               "12. Cek Status Undangan: /info (jadwal mendatang), /info semua (seluruh data), atau /info bulan [nama_bulan]\n\n" +
                "ATURAN SUPER KETAT UNTUK INPUT UNDANGAN BARU (/i):\n" +
                "- Kamu HARUS mengekstrak 5 data wajib: (Pengirim, Nama Kegiatan, Tanggal, Jam, Lokasi).\n" +
                "- JIKA ada data yang kurang/tidak disebutkan di pesan asli, JANGAN berikan format /i! Balas dengan: ERROR: Pesan kamu kurang lengkap nih! Tolong sebutkan [sebutkan bagian yang kurang, misal: lokasi acaranya di mana dan jam berapa?] agar Monalissa bisa mencatatnya ke buku tamu 💅\n" +
@@ -2324,10 +2326,13 @@ function extractUndanganWithGemini(textInput) {
                "- Output HARUS HANYA format baku yang diawali dengan slash (/) jika pesan lengkap.\n" +
                "- JIKA pesan meminta untuk mengecek jadwal undangan, gunakan format: /info (jika umum), /info semua (jika meminta semua waktu), atau /info bulan nama_bulan (jika meminta bulan spesifik).\n" +
                "- JIKA pesan meminta untuk mengecek status, rekap, daftar, atau menanyakan kabar media partner (medpart), gunakan format: /info medpart\n" +
+               "- JIKA pesan meminta untuk mengecek status sponsorship, gunakan format: /info sponsor\n" +
+               "- JIKA pesan meminta untuk mengecek status partnership, gunakan format: /info partner\n" +
                "- JIKA pesan berisi kalimat mengirimkan/menyerahkan Link GDrive untuk Bukti Syarat Medpart yang sudah ada, gunakan format: /edit ID_Medpart Bukti LinkGdrive-nya\n" +
                "- Jika pesan berisi niat untuk mengunggah 'foto bukti kehadiran undangan', gunakan format /f ID_Surat (tanpa embel-embel lain).\n" +
                "- Jika pesan berisi niat untuk mengunggah 'foto poster media partner/medpart', gunakan format /fmp ID_Medpart.\n" +
-               "- Jika pesan berisi informasi awal pendaftaran media partner baru, gunakan format /mp diikuti baris baru (Instansi: ..., Cp: ..., Tanggal Upload: ..., dan Link Bukti: ...). Jika ada yang belum ada, tulis 'Menunggu Syarat'.\n" +
+               "- JIKA pesan mengisyaratkan pendaftaran media partner baru (/mp) ATAU sponsorship (/sp) ATAU partnership (/pt), kamu HARUS mengekstrak minimal Nama Instansi. Jika nama instansi TIDAK DIBERIKAN, balas dengan: ERROR: Pesan kamu kurang lengkap nih! Siapa nama instansinya?\n" +
+               "- Untuk /mp, jika data selain Instansi tidak ada, tulis 'Menunggu Syarat'.\n" +
                "- Jika pesan menyatakan ketersediaan hadir/ikut delegasi, gunakan format /a. Ekstrak nama orangnya jika ada, gunakan Huruf Kapital di Awal Kata.\n" +
                "- Jika pesan menyatakan batal/tidak jadi ikut, gunakan format /tarik.\n" +
                "- Jika pesan meminta hapus data, gunakan format /hapus.\n\n" +
@@ -2455,9 +2460,11 @@ function processWizardInput(chatId, userId, text, userMessageId, msg) {
   var cache = CacheService.getScriptCache();
   var userState = cache.get("WIZ_STATE_" + userId);
 
-  // ---- INTERCEPT CLOVER MENU SAAT SEDANG WIZARD ----
+  // ---- INTERCEPT COMMAND DAN CLOVER MENU SAAT SEDANG WIZARD ----
+  var isCommand = text && text.startsWith("/");
   var isMenuButton = text && (text === "🏢 Pekerjaan" || text === "📊 Informasi" || text === "🛠️ Admin");
-  if (text && (text.toLowerCase() === "/batal" || isMenuButton)) {
+  
+  if (isCommand || isMenuButton) {
     if (userState !== null) {
       cache.remove("WIZ_STATE_" + userId);
       cache.remove("WIZ_PENGIRIM_" + userId);
@@ -2479,9 +2486,15 @@ function processWizardInput(chatId, userId, text, userMessageId, msg) {
       trackMsg(userId, userMessageId);
       clearWizardMessages(chatId, userId);
       
-      if (!isMenuButton) kirimMenuUtama(chatId, "❌ Proses input dibatalkan.");
+      if (text.toLowerCase() === "/batal") {
+         kirimMenuUtama(chatId, "❌ Proses input dibatalkan.");
+         return true; // Stop here, /batal sudah di-handle
+      }
     }
-    if (isMenuButton) return false; // Lanjut ke Clover Handler di bawah
+    
+    // Kalau dia ketik command lain (misal /hapus) atau klik menu Clover, 
+    // kita biarkan flow-nya lanjut ke fungsi pembaca command/menu di bawah!
+    if (isMenuButton || isCommand) return false; 
     return true;
   }
   
