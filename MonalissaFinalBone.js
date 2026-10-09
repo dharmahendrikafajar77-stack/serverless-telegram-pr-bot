@@ -344,6 +344,23 @@ function processUpdate(update) {
      return;
   }
 
+  if (teksLower === "/clover") {
+     if (isPrivateChat) {
+         var dataUserVerif = verifikasiMember(userId);
+         var menuUtamaKbd = [ [{"text": "🏢 Pekerjaan"}, {"text": "📊 Informasi"}] ];
+         if (dataUserVerif.isAdmin) menuUtamaKbd.push([{"text": "🛠️ Admin"}]);
+         
+         var cloverKeyboard = {
+           "keyboard": menuUtamaKbd,
+           "resize_keyboard": true,
+           "one_time_keyboard": false,
+           "is_persistent": true
+         };
+         sendMessage(chatId, "🍀 Ini dia tombol Clover-nya! Coba cek di bagian bawah chat (di dekat kotak ketik).", cloverKeyboard);
+     }
+     return;
+  }
+
  if (teksLower === "/tutor") {
     var tutorText = "📚 *PANDUAN LENGKAP MONALISSA* 📚\n\n" +
       "🔹 `/i` *(Input Undangan Baru)*\nKetik langsung:\n`/i Pengirim, Kegiatan, Tgl/Bln, Jam Menit, Lokasi`\n\n" +
