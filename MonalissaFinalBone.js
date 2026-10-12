@@ -724,14 +724,25 @@ function processUpdate(update) {
         return sendMessage(chatId, "❌ *ID belum diisi!*\nContoh: `/hapus U01` atau `/hapus M01`");
      }
      
-     var isMedpart = idHapus.startsWith("M");
-     var namaSheet = isMedpart ? "Medpart" : "Undangan";
-     var headerRows = 2; // Undangan dan Medpart sama-sama pakai 2 baris (Title & Header)
+     var prefix = idHapus.charAt(0);
+     var namaSheet = "";
+     var headerRows = 1;
+     var jenis = "";
+     
+     if (prefix === "U") { namaSheet = "Undangan"; headerRows = 2; jenis = "Undangan"; }
+     else if (prefix === "M") { namaSheet = "Medpart"; headerRows = 1; jenis = "Media Partner"; }
+     else if (prefix === "S") { namaSheet = "Sponsorship"; headerRows = 1; jenis = "Sponsorship"; }
+     else if (prefix === "P") { namaSheet = "Partnership"; headerRows = 1; jenis = "Partnership"; }
+     else {
+         return sendMessage(chatId, "❌ *Format ID salah!*\nID harus diawali huruf U, M, S, atau P.");
+     }
      
      var sheet = SpreadsheetApp.openById(sheetId).getSheetByName(namaSheet);
-     if (!sheet && isMedpart) sheet = SpreadsheetApp.openById(sheetId).getSheetByName("Media Partner");
+     if (!sheet && prefix === "M") sheet = SpreadsheetApp.openById(sheetId).getSheetByName("Media Partner");
+     if (!sheet && prefix === "S") sheet = SpreadsheetApp.openById(sheetId).getSheetByName("Sponsor");
+     if (!sheet && prefix === "P") sheet = SpreadsheetApp.openById(sheetId).getSheetByName("Partner");
      
-     if (!sheet) return sendMessage(chatId, "❌ Sheet " + namaSheet + " tidak ditemukan.");
+     if (!sheet) return sendMessage(chatId, "❌ Sheet " + jenis + " tidak ditemukan.");
      
      var dataAll = sheet.getDataRange().getValues();
      var barisDitemukan = -1;
@@ -749,7 +760,6 @@ function processUpdate(update) {
         if (numRows > 0) {
            var newNumbers = [];
            var newIDs = [];
-           var prefix = isMedpart ? "M" : "U";
            for (var r = 1; r <= numRows; r++) {
               newNumbers.push([r]);
               newIDs.push([prefix + String(r).padStart(2, '0')]);
@@ -757,11 +767,9 @@ function processUpdate(update) {
            sheet.getRange(headerRows + 1, 1, numRows, 1).setValues(newNumbers);
            sheet.getRange(headerRows + 1, 2, numRows, 1).setValues(newIDs);
         }
-        
-        var jenis = isMedpart ? "Media Partner" : "Undangan";
         kirimBalasanGanda(chatId, "✅ Data " + jenis + " *" + idHapus + "* berhasil dihapus secara permanen dan penomoran (NO) telah dirapikan kembali. 💅");
      } else {
-        sendMessage(chatId, "❌ ID *" + idHapus + "* tidak ditemukan di database " + (isMedpart ? "Medpart" : "Undangan") + ".");
+        sendMessage(chatId, "❌ ID *" + idHapus + "* tidak ditemukan di database " + jenis + ".");
      }
      return;
   }
@@ -780,7 +788,7 @@ function processUpdate(update) {
      
      var sheet = isMedpart ? SpreadsheetApp.openById(sheetId).getSheetByName("Medpart") || SpreadsheetApp.openById(sheetId).getSheetByName("Media Partner") : SpreadsheetApp.openById(sheetId).getSheetByName("Undangan");
      
-     if (!sheet) return sendMessage(chatId, "❌ Sheet " + (isMedpart ? "Medpart" : "Undangan") + " tidak ditemukan.");
+     if (!sheet) return sendMessage(chatId, "❌ Sheet " + jenis + " tidak ditemukan.");
      
      var dataAll = sheet.getDataRange().getValues();
      var barisDitemukan = -1;
@@ -969,7 +977,7 @@ function processUpdate(update) {
     // Urutan kolom: NO (1), ID Medpart (2), Tgl Masuk (3), Instansi (4), Cp (5), Tgl Upload (6), Bukti (7), Poster (8)
     sheetMp.appendRow([newIdNumber, newId, new Date(), instansiRapi, cpFinal, tglFixed, linkBuktiFinal, ""]); 
     
-    kirimBalasanGanda(chatId, "✅ *DATA MEDIA PARTNER DICATAT!* 💅\n\n*ID Medpart:* " + newId + "\n*Instansi:* " + instansiRapi + "\n*Tanggal Upload:* " + tglFixed + "\n\n_Catatan:_\n1. Jika Link GDrive Bukti Syarat (Follow & Like) sudah dikirim oleh mereka, setor ke AI dengan bilang: *'Ini link bukti syarat buat " + newId + " https://drive...'*.\n2. Jika nanti Poster Final sudah direvisi, baru upload fotonya dengan caption `/fmp " + newId + "` ya!");
+    kirimBalasanGanda(chatId, "✅ *DATA MEDIA PARTNER DICATAT!* 💅\n\n*ID Medpart:* " + newId + "\n*Instansi:* " + instansiRapi + "\n*Tanggal Upload:* " + tglFixed + "\n\n_Catatan:_\n1. Jika Link GDrive Bukti Syarat (Follow & Like) sudah dikirim oleh mereka, setor ke AI dengan bilang: *'Ini link bukti syarat buat " + newId + " https://drive...'*.\n2. Jika nanti Poster Final sudah direvisi, upload fotonya lewat *Menu Pekerjaan -> Media Partner -> Update Mediapartner* di DM @MonalissaPR_bot ya!");
     return;
   }
 
@@ -988,15 +996,18 @@ function processUpdate(update) {
     }
     
     var sheetSp = SpreadsheetApp.openById(sheetId).getSheetByName("Sponsorship");
+    if (!sheetSp) sheetSp = SpreadsheetApp.openById(sheetId).getSheetByName("Sponsor");
+    
     var lastRowSp = sheetSp.getLastRow();
-    var nomorUrut = lastRowSp < 2 ? 1 : lastRowSp - 1;
+    var nomorUrut = lastRowSp < 2 ? 1 : lastRowSp;
+    var newId = "S" + String(nomorUrut).padStart(2, '0');
     
     var tglRaw = waktu.trim().split(/[-/]/);
     var tglFixed = (tglRaw[0] ? tglRaw[0].trim().padStart(2, '0') : "01") + "/" + (tglRaw[1] ? tglRaw[1].trim().padStart(2, '0') : "01");
 
-    // Urutan: NO, Instansi, Tanggal, Persyaratan, Benefit
-    sheetSp.appendRow([nomorUrut, instansi.trim(), tglFixed, syarat.trim(), benefit.trim()]);
-    kirimBalasanGanda(chatId, "💰 *DATA SPONSORSHIP DICATAT!* 💰\n\nInstansi: " + instansi.trim() + "\nBenefit:\n" + benefit.trim());
+    // Urutan: NO, ID Sponsor, Instansi, Tanggal, Persyaratan, Benefit, MoU
+    sheetSp.appendRow([nomorUrut, newId, instansi.trim(), tglFixed, syarat.trim(), benefit.trim(), "Belum Ada"]);
+    kirimBalasanGanda(chatId, "💰 *DATA SPONSORSHIP DICATAT!* 💰\n\n*ID:* " + newId + "\n*Instansi:* " + instansi.trim() + "\n*Benefit:*\n" + benefit.trim());
     return;
   }
 
@@ -1016,13 +1027,16 @@ function processUpdate(update) {
     }
     
     var sheetPt = SpreadsheetApp.openById(sheetId).getSheetByName("Partnership");
+    if (!sheetPt) sheetPt = SpreadsheetApp.openById(sheetId).getSheetByName("Partner");
+    
     var lastRowPt = sheetPt.getLastRow();
-    var nomorUrut = lastRowPt < 2 ? 1 : lastRowPt - 1;
+    var nomorUrut = lastRowPt < 2 ? 1 : lastRowPt;
+    var newId = "P" + String(nomorUrut).padStart(2, '0');
     
-    // Urutan Sheet: NO, Instansi, Persyaratan, Benefit, Mulai, Selesai
-    sheetPt.appendRow([nomorUrut, instansi.trim(), syarat.trim(), benefit.trim(), mulai.trim(), selesai.trim()]);
+    // Urutan Sheet: NO, ID Partner, Instansi, Persyaratan, Benefit, Mulai, Selesai, MoU
+    sheetPt.appendRow([nomorUrut, newId, instansi.trim(), syarat.trim(), benefit.trim(), mulai.trim(), selesai.trim(), "Belum Ada"]);
     
-    kirimBalasanGanda(chatId, "🤝 *DATA PARTNERSHIP DICATAT!* 🤝\n\nInstansi: " + instansi.trim() + "\nBenefit:\n" + benefit.trim() + "\n\nDurasi: " + mulai.trim() + " s/d " + selesai.trim());
+    kirimBalasanGanda(chatId, "🤝 *DATA PARTNERSHIP DICATAT!* 🤝\n\n*ID:* " + newId + "\n*Instansi:* " + instansi.trim() + "\n*Benefit:*\n" + benefit.trim() + "\n\n*Durasi:* " + mulai.trim() + " s/d " + selesai.trim());
     return;
   }
   
@@ -1295,7 +1309,7 @@ function reminderBelumAdaDelegasi() {
   }
   
   if (pesan !== "") {
-    var finalPesan = "🔔 *UNDANGAN KOSONG* 🔔\n\nHalo Tim PR! Undangan berikut masih belum memiliki delegasi:\n\n" + pesan + "Ayo segera ambil slotnya dengan membalas `/a ID_Surat Nama_Kamu`!";
+    var finalPesan = "🔔 *UNDANGAN KOSONG* 🔔\n\nHalo Tim PR! Undangan berikut masih belum memiliki delegasi:\n\n" + pesan + "Ayo segera ambil slotnya! Silakan daftarkan diri lewat *Menu Pekerjaan -> Ambil Delegasi* di Personal Chat (DM) @MonalissaPR_bot";
     sendMessage(grupChatId, finalPesan);
   }
 }
@@ -1359,12 +1373,12 @@ function reminderDelegasi() {
               var waktuTampil = namaHari + " (" + jam + ":" + menit + " WIB) " + tglFormat + " " + namaBulan;
 
               var infoDelegasi = prosesDelegasiTag(delegasi);
-              var pesanGrup = "⏰ *REMINDER* ⏰\n\n" + labelHari + "\n\nHalo " + infoDelegasi.mentionText + "! Jangan lupa jadwal kegiatan kamu yang semakin dekat:\n\n🔹 *" + kegiatan + "* (" + uk + ")\n📍 " + waktuTampil + " - " + lokasi + "\n\nSemangat bertugas dan jangan lupa kirim foto bukti kehadiran pakai `/f " + idSurat + "` ya! 💅";
+              var pesanGrup = "⏰ *REMINDER* ⏰\n\n" + labelHari + "\n\nHalo " + infoDelegasi.mentionText + "! Jangan lupa jadwal kegiatan kamu yang semakin dekat:\n\n🔹 *" + kegiatan + "* (" + uk + ")\n📍 " + waktuTampil + " - " + lokasi + "\n\nSemangat bertugas! Setelah kegiatan selesai, jangan lupa unggah foto bukti kehadiran (" + idSurat + ") lewat *Menu Pekerjaan -> Undangan -> Unggah Bukti Kehadiran* di Personal Chat (DM) @MonalissaPR_bot ya! 💅";
               sendMessage(grupChatId, pesanGrup);
               
               for (var d = 0; d < infoDelegasi.dmList.length; d++) {
                   var userTarget = infoDelegasi.dmList[d];
-                  var pesanDM = "⏰ *REMINDER PERSONAL* ⏰\n\n" + labelHari + "\n\nHalo *" + userTarget.nama + "*! Ini pengingat langsung dari Monalissa untuk kegiatanmu:\n\n🔹 *" + kegiatan + "* (" + uk + ")\n📍 " + waktuTampil + " - " + lokasi + "\n\nKirim `/f " + idSurat + "` beserta foto ya nanti! 💅";
+                  var pesanDM = "⏰ *REMINDER PERSONAL* ⏰\n\n" + labelHari + "\n\nHalo *" + userTarget.nama + "*! Ini pengingat langsung dari Monalissa untuk kegiatanmu:\n\n🔹 *" + kegiatan + "* (" + uk + ")\n📍 " + waktuTampil + " - " + lokasi + "\n\nSemangat bertugas! Setelah kegiatan selesai, jangan lupa unggah foto bukti kehadiran (" + idSurat + ") lewat *Menu Pekerjaan -> Undangan -> Unggah Bukti Kehadiran* ya! 💅";
                   sendMessage(userTarget.id, pesanDM);
               }
            }
@@ -1827,7 +1841,8 @@ function handleCallback(callbackQuery) {
   if (action === "ADMIN_HAPUS") {
      var modul = parts[1];
      var contoh = "U01, M05";
-     if (modul === "SPONSOR" || modul === "PARTNER") contoh = "1, 2, 3 (Nomor Urut)";
+     if (modul === "SPONSOR") contoh = "S01, S02";
+     else if (modul === "PARTNER") contoh = "P01, P02";
      
      var textBaru = "🗑️ *HAPUS DATA " + modul + "*\n\nSilakan ketik *ID Data* yang ingin dihapus.\n_(Misalnya: " + contoh + ")_";
      var keyboard = { inline_keyboard: [[{"text": "🔙 Batal", "callback_data": "MENU_ADMIN_HAPUS"}]] };
@@ -1845,17 +1860,18 @@ function handleCallback(callbackQuery) {
       var idHapus = parts[2];
       
       var namaSheet = "";
-      var headerRows = 0;
-      var hasStringId = false;
+      var headerRows = 1;
+      var hasStringId = true;
       var prefix = "";
       
-      if (modul === "UNDANGAN") { namaSheet = "Undangan"; headerRows = 2; hasStringId = true; prefix = "U"; }
-      else if (modul === "MEDPART") { namaSheet = "Medpart"; headerRows = 2; hasStringId = true; prefix = "M"; }
-      else if (modul === "SPONSOR") { namaSheet = "Sponsorship"; headerRows = 1; } 
-      else if (modul === "PARTNER") { namaSheet = "Partnership"; headerRows = 1; }
+      if (modul === "UNDANGAN") { namaSheet = "Undangan"; headerRows = 2; prefix = "U"; }
+      else if (modul === "MEDPART") { namaSheet = "Medpart"; headerRows = 1; prefix = "M"; }
+      else if (modul === "SPONSOR") { namaSheet = "Sponsorship"; headerRows = 1; prefix = "S"; } 
+      else if (modul === "PARTNER") { namaSheet = "Partnership"; headerRows = 1; prefix = "P"; }
       
       var sheet = SpreadsheetApp.openById(sheetId).getSheetByName(namaSheet);
       if (!sheet && modul === "MEDPART") sheet = SpreadsheetApp.openById(sheetId).getSheetByName("Media Partner");
+      if (!sheet && modul === "SPONSOR") sheet = SpreadsheetApp.openById(sheetId).getSheetByName("Sponsor");
       
       if (!sheet) {
           UrlFetchApp.fetch("https://api.telegram.org/bot" + token + "/editMessageText", { method: "post", contentType: "application/json", payload: JSON.stringify({ chat_id: String(chatId), message_id: messageId, text: "❌ Sheet " + modul + " tidak ditemukan." }), muteHttpExceptions: true });
@@ -2214,7 +2230,7 @@ function hapusDelegasiTanpaBukti() {
                 // Kirim teguran ke DM masing-masing delegasi
                 for (var d = 0; d < infoDelegasi.dmList.length; d++) {
                    var userTarget = infoDelegasi.dmList[d];
-                   var pesanTeguranDM = "🚨 *TEGURAN DARI MONALISSA* 🚨\n\nHalo *" + userTarget.nama + "*!\n\nKegiatan *" + kegiatan + "* (" + idSurat + ") sudah berlalu lebih dari 3 hari, tapi kamu belum mengunggah foto bukti kehadiran sama sekali.\n\nAyo segera kirim foto dengan caption `/f " + idSurat + "` ke grup atau balas pesan ini. Jika tidak, keikutsertaan delegasimu akan dihapus oleh Admin! 💅";
+                   var pesanTeguranDM = "🚨 *TEGURAN DARI MONALISSA* 🚨\n\nHalo *" + userTarget.nama + "*!\n\nKegiatan *" + kegiatan + "* (" + idSurat + ") sudah berlalu lebih dari 3 hari, tapi kamu belum mengunggah foto bukti kehadiran sama sekali.\n\nAyo segera unggah foto bukti kehadiran (" + idSurat + ") lewat *Menu Pekerjaan -> Undangan -> Unggah Bukti Kehadiran* di bot ini (@MonalissaPR_bot). Jika tidak, keikutsertaan delegasimu akan dihapus oleh Admin! 💅";
                    sendMessage(userTarget.id, pesanTeguranDM);
                 }
              }
@@ -2584,7 +2600,7 @@ function processWizardInput(chatId, userId, text, userMessageId, msg) {
     
     clearWizardMessages(chatId, userId);
 
-    var balasan = "🚨 *UNDANGAN BARU MASUK!* 🚨\n_(via Menu Interaktif 🍀)_\n\n*ID Surat:* " + idSurat + "\n*UK Pengirim:* " + pengirim + "\n*Kegiatan:* " + kegiatan + "\n*Waktu:* " + waktuTampil + "\n*Lokasi:* " + lokasi + "\n\n👥 _Siapa yang bersedia? Silakan daftarkan diri lewat *Menu Pekerjaan -> Ambil Delegasi* di Personal Chat (DM) Monalissa._";
+    var balasan = "🚨 *UNDANGAN BARU MASUK!* 🚨\n_(via Menu Interaktif 🍀)_\n\n*ID Surat:* " + idSurat + "\n*UK Pengirim:* " + pengirim + "\n*Kegiatan:* " + kegiatan + "\n*Waktu:* " + waktuTampil + "\n*Lokasi:* " + lokasi + "\n\n👥 _Siapa yang bersedia? Silakan daftarkan diri lewat *Menu Pekerjaan -> Ambil Delegasi* di Personal Chat (DM) @MonalissaPR_bot _";
     kirimMenuUtama(chatId, balasan);
     
     if (grupChatId && String(chatId) !== String(grupChatId)) {
@@ -2846,8 +2862,8 @@ function processWizardInput(chatId, userId, text, userMessageId, msg) {
      
      var maxID = 0;
      var lr = sheetPt.getLastRow();
-     if (lr >= 3) {
-        var dataID = sheetPt.getRange("B3:B" + lr).getValues();
+     if (lr >= 2) {
+        var dataID = sheetPt.getRange("B2:B" + lr).getValues();
         for (var i = 0; i < dataID.length; i++) {
           var idSekarang = dataID[i][0].toString().replace("P", "");
           var angkaID = parseInt(idSekarang, 10);
@@ -2855,16 +2871,14 @@ function processWizardInput(chatId, userId, text, userMessageId, msg) {
         }
      }
      var idPrt = "P" + String(maxID + 1).padStart(2, '0');
+     var nomorUrut = lr < 2 ? 1 : lr;
      
-     var barisTujuan = sheetPt.getLastRow() + 1;
-     var nomorUrut = barisTujuan > 2 ? barisTujuan - 2 : 1;
-     
-     // Asumsi urutan kolom: NO, ID Partner, Instansi, Tgl Mulai, Tgl Selesai, PoA UKBA, PoA Eksternal, MoU
-     sheetPt.appendRow([nomorUrut, idPrt, smartTitleCase(instansi), mulai, selesai, syarat, benefit, mou]);
+     // Asumsi urutan kolom: NO, ID Partner, Instansi, Persyaratan, Benefit, Mulai, Selesai, MoU
+     sheetPt.appendRow([nomorUrut, idPrt, smartTitleCase(instansi), syarat, benefit, mulai, selesai, mou]);
      
      clearWizardMessages(chatId, userId);
      
-     var balasan = "🔗 *PARTNERSHIP BARU TERCATAT!* 🔗\n\n*Instansi:* " + smartTitleCase(instansi) + "\n*Periode:* " + formatTanggalInput(mulai) + " - " + formatTanggalInput(selesai) + "\n*PoA UKBA:* \n" + syarat + "\n*PoA Eksternal:* \n" + benefit + "\n*MoU:* " + (mou || "❌ Belum ada data");
+     var balasan = "🔗 *PARTNERSHIP BARU TERCATAT!* 🔗\n\n*ID:* " + idPrt + "\n*Instansi:* " + smartTitleCase(instansi) + "\n*Periode:* " + formatTanggalInput(mulai) + " - " + formatTanggalInput(selesai) + "\n*PoA UKBA:* \n" + syarat + "\n*PoA Eksternal:* \n" + benefit + "\n*MoU:* " + (mou || "❌ Belum ada data");
      kirimMenuUtama(chatId, balasan);
      if (grupChatId && String(chatId) !== String(grupChatId)) {
        sendMessage(grupChatId, balasan);
@@ -3130,22 +3144,21 @@ function processWizardInput(chatId, userId, text, userMessageId, msg) {
      var idHapusRaw = text.trim().toUpperCase();
      var idHapus = idHapusRaw;
      
-     var hasStringId = false;
+     var hasStringId = true;
      var namaSheet = "";
-     if (modul === "UNDANGAN") { namaSheet = "Undangan"; hasStringId = true; }
-     else if (modul === "MEDPART") { namaSheet = "Medpart"; hasStringId = true; }
+     if (modul === "UNDANGAN") { namaSheet = "Undangan"; }
+     else if (modul === "MEDPART") { namaSheet = "Medpart"; }
      else if (modul === "SPONSOR") { namaSheet = "Sponsorship"; }
      else if (modul === "PARTNER") { namaSheet = "Partnership"; }
      
-     if (hasStringId) {
-         if (modul === "UNDANGAN" && !idHapus.startsWith("U")) idHapus = "U" + idHapus.padStart(2, '0');
-         else if (modul === "MEDPART" && !idHapus.startsWith("M")) idHapus = "M" + idHapus.padStart(2, '0');
-     } else {
-         idHapus = idHapus.replace(/[^0-9]/g, "");
-     }
+     if (modul === "UNDANGAN" && !idHapus.startsWith("U")) idHapus = "U" + idHapus.padStart(2, '0');
+     else if (modul === "MEDPART" && !idHapus.startsWith("M")) idHapus = "M" + idHapus.padStart(2, '0');
+     else if (modul === "SPONSOR" && !idHapus.startsWith("S")) idHapus = "S" + idHapus.padStart(2, '0');
+     else if (modul === "PARTNER" && !idHapus.startsWith("P")) idHapus = "P" + idHapus.padStart(2, '0');
      
      var checkSheet = SpreadsheetApp.openById(sheetId).getSheetByName(namaSheet);
      if(!checkSheet && modul === "MEDPART") checkSheet = SpreadsheetApp.openById(sheetId).getSheetByName("Media Partner");
+     if(!checkSheet && modul === "SPONSOR") checkSheet = SpreadsheetApp.openById(sheetId).getSheetByName("Sponsor");
      
      if (!checkSheet) {
          var errId = sendMessage(chatId, "❌ Modul " + modul + " belum didukung (Sheet tidak ditemukan).");
@@ -3157,31 +3170,26 @@ function processWizardInput(chatId, userId, text, userMessageId, msg) {
      var found = false;
      var info = "";
      for (var i = 0; i < dataAll.length; i++) {
-         if (hasStringId) {
-             if (dataAll[i][1] === idHapus) { 
-                 found = true; 
-                 if (modul === "UNDANGAN") {
-                     var wktRaw = dataAll[i][5];
-                     var wktFormat = "";
-                     if (wktRaw) {
-                         wktFormat = (wktRaw instanceof Date) ? Utilities.formatDate(wktRaw, "Asia/Jakarta", "dd/MMM/yyyy HH:mm") : String(wktRaw);
-                     }
-                     var keg = dataAll[i][4] ? String(dataAll[i][4]).trim() : "(Kegiatan Kosong)";
-                     var lok = dataAll[i][6] ? String(dataAll[i][6]).trim() : "(Lokasi Kosong)";
-                     var wktStr = wktFormat ? wktFormat : "(Waktu Kosong)";
-                     
-                     info = "*" + (dataAll[i][3] || "Tanpa Pengirim") + "* - " + keg + "\n🗓️ *Waktu:* " + wktStr + "\n📍 *Lokasi:* " + lok;
-                 } else {
-                     info = dataAll[i][3] ? String(dataAll[i][3]).trim() : "(Data Kosong)"; // Medpart instansi
+         if (dataAll[i][1] === idHapus) { 
+             found = true; 
+             if (modul === "UNDANGAN") {
+                 var wktRaw = dataAll[i][5];
+                 var wktFormat = "";
+                 if (wktRaw) {
+                     wktFormat = (wktRaw instanceof Date) ? Utilities.formatDate(wktRaw, "Asia/Jakarta", "dd/MMM/yyyy HH:mm") : String(wktRaw);
                  }
-                 break; 
+                 var keg = dataAll[i][4] ? String(dataAll[i][4]).trim() : "(Kegiatan Kosong)";
+                 var lok = dataAll[i][6] ? String(dataAll[i][6]).trim() : "(Lokasi Kosong)";
+                 var wktStr = wktFormat ? wktFormat : "(Waktu Kosong)";
+                 
+                 info = "*" + (dataAll[i][3] || "Tanpa Pengirim") + "* - " + keg + "\n🗓️ *Waktu:* " + wktStr + "\n📍 *Lokasi:* " + lok;
+             } else if (modul === "MEDPART" || modul === "SPONSOR" || modul === "PARTNER") {
+                 info = dataAll[i][3] ? String(dataAll[i][3]).trim() : "(Data Kosong)"; // Instansi ada di index 3 untuk MP/SP/PT yang format kolomnya sudah diperbaiki
+                 if (modul !== "MEDPART" && !dataAll[i][3] && dataAll[i][2]) {
+                     info = String(dataAll[i][2]).trim(); // Fallback untuk SP/PT kalau kolomnya lama
+                 }
              }
-         } else {
-             if (String(dataAll[i][0]) === String(idHapus)) { 
-                 found = true; 
-                 info = dataAll[i][1]; // Kolom index 1 (Instansi)
-                 break; 
-             }
+             break; 
          }
      }
      

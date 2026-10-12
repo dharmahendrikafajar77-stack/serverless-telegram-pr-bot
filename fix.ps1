@@ -1,0 +1,5 @@
+$content = [System.IO.File]::ReadAllText('MonalissaFinalBone.js')
+$content = $content.Replace("            var prefix = isMedpart ? `"M`" : `"U`";`r`n", "")
+$content = $content.Replace("         var jenis = isMedpart ? `"Media Partner`" : `"Undangan`";`r`n", "")
+$content = $content.Replace("`"❌ ID *`" + idHapus + `"* tidak ditemukan di database `" + (isMedpart ? `"Medpart`" : `"Undangan`") + `".`"", "`"❌ ID *`" + idHapus + `"* tidak ditemukan di database `" + jenis + `".`"")
+[System.IO.File]::WriteAllText('MonalissaFinalBone.js', $content)
